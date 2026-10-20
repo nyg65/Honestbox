@@ -53,6 +53,16 @@ Set `HB_DB_PATH` to put it elsewhere, and `HB_ADMIN_PASSWORD` before first start
 - Boxes can be switched off in one click (drops keep running), and are closed in the excluded states.
 - Every credit change is a ledger row; every owner action is in the audit log.
 
+## Deploy on Render (test mode)
+
+`render.yaml` defines everything: one Node web service on the Starter plan with a 1 GB persistent disk at `/var/data` for the database.
+
+1. In Render, choose **New > Blueprint** and pick this GitHub repository.
+2. When asked for `HB_ADMIN_PASSWORD`, enter a strong password. It becomes the admin password on first start.
+3. Deploy. Every push to `main` redeploys automatically.
+
+The free plan has no disk, so it would erase every account and pull on each restart. Stay on Starter or higher.
+
 ## Before real money (in this order)
 
 1. **Gaming attorney opinion.** Sets the excluded states, the official rules, the free-entry method and the terms. The legal pages are marked as drafts.

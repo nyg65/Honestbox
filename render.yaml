@@ -1,0 +1,27 @@
+# Render Blueprint for HonestBox (test mode).
+# One web service with a persistent disk for the SQLite database.
+# Render: New > Blueprint > pick this repository.
+services:
+  - type: web
+    name: honestbox
+    runtime: node
+    plan: starter            # a persistent disk needs a paid plan; the free plan erases data on every restart
+    region: oregon
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22.22.0
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: HB_DB_PATH
+        value: /var/data/honestbox.db
+      - key: HB_ADMIN_PASSWORD
+        sync: false          # Render asks for this when you create the service; it sets the admin password on first start
+    disk:
+      name: honestbox-data
+      mountPath: /var/data
+      sizeGB: 1
