@@ -17,7 +17,11 @@ export type Watch = {
 export type Pull = {
   id: number; user_id: number; box_id: number; band_id: number; watch_id: number; price_cents: number; value_cents: number;
   seed_id: number; nonce: number; roll_ppm: number; odds_snapshot: string; status: string; hold_until: string; revealed: number; created_at: string;
+  locked_cents: number | null; locked_at: string | null;
 };
+
+/** The value a vault pull is bought back against: the locked value if the customer locked it, otherwise today's market value. */
+export const valueBasis = (p: { locked_cents: number | null; market_cents: number }) => p.locked_cents ?? p.market_cents;
 
 // ---------- settings ----------
 export function settings(d: DatabaseSync = db()): Record<string, string> {
@@ -155,17 +159,40 @@ export function buybackQuote(marketCents: number, s: Record<string, string>) {
   };
 }
 
-export function sellBack(userId: number, pullId: number, method: 'credit' | 'cash') {
+/** Freezes the buyback value at today's market value. One-way: a locked pull no longer follows the market up or down. */
+export function lockValue(userId: number, pullId: number) {
+  return tx((d) => {
+    const s = settings(d);
+    if (!flag(s, 'lock_enabled')) throw new UserError('Locking a value is not available right now.');
+    const p = getPull(userId, pullId, d);
+    if (!p) throw new UserError('We could not find that pull.');
+    if (p.status !== 'vault') throw new UserError('Only a watch in your vault can be locked.');
+    if (p.locked_cents != null) throw new UserError('This watch is already locked.');
+    d.prepare('UPDATE pulls SET locked_cents = ?, locked_at = ? WHERE id = ?').run(p.market_cents, now(), pullId);
+    audit(d, userId, 'pull.lock', `pull ${pullId} at ${p.market_cents}`);
+    return p.market_cents;
+  });
+}
+
+/** Pulls whose vault time has run out are sold back for credit at that day's value. Called on page views. */
+export function expireHolds(userId: number) {
+  const due = db().prepare(`SELECT id FROM pulls WHERE user_id = ? AND status = 'vault' AND hold_until < ?`).all(userId, now()) as { id: number }[];
+  for (const p of due) {
+    try { sellBack(userId, p.id, 'credit', { expired: true }); } catch (e) { if (!(e instanceof UserError)) throw e; }
+  }
+}
+
+export function sellBack(userId: number, pullId: number, method: 'credit' | 'cash', opts: { expired?: boolean } = {}) {
   return tx((d) => {
     const s = settings(d);
     const p = getPull(userId, pullId, d);
     if (!p) throw new UserError('We could not find that pull.');
     if (p.status !== 'vault') throw new UserError('This pull has already been sold back or shipped.');
-    const q = buybackQuote(p.market_cents, s);
+    const q = buybackQuote(valueBasis(p), s);
     const user = d.prepare('SELECT id_verified FROM users WHERE id = ?').get(userId) as { id_verified: number };
     let status = 'paid';
     if (method === 'credit') {
-      post(d, userId, 'buyback_credit', q.credit, `Sold back ${p.brand} ${p.model} for credit`, `pull:${pullId}`);
+      post(d, userId, 'buyback_credit', q.credit, `Sold back ${p.brand} ${p.model} for credit${opts.expired ? ' (vault time ended)' : ''}`, `pull:${pullId}`);
     } else {
       if (q.cash > num(s, 'cash_id_threshold_cents') && !user.id_verified) {
         throw new UserError(`Cash payouts over ${usd(num(s, 'cash_id_threshold_cents'))} need a verified ID. Verify your ID in Account, or take credit.`);
@@ -188,12 +215,23 @@ function checkAddress(a: Address) {
   }
 }
 
+/** Shipping fee for a pull: charged only on low-value watches, where free insured shipping would cost more than the watch earns. */
+export function shipFee(marketCents: number, s: Record<string, string>): number {
+  return marketCents < num(s, 'ship_fee_under_cents') ? num(s, 'ship_fee_cents') : 0;
+}
+
 export function requestShip(userId: number, pullId: number, a: Address) {
   checkAddress(a);
   return tx((d) => {
     const p = getPull(userId, pullId, d);
     if (!p) throw new UserError('We could not find that pull.');
     if (p.status !== 'vault') throw new UserError('This pull has already been sold back or shipped.');
+    const fee = shipFee(p.market_cents, settings(d));
+    if (fee > 0) {
+      const bal = balance(userId, d);
+      if (bal < fee) throw new UserError(`Shipping this watch costs ${usd(fee)}, and you have ${usd(bal)} in credit. Add credit, or sell it back instead.`);
+      post(d, userId, 'shipping_fee', -fee, `Insured shipping, ${p.brand} ${p.model}`, `pull:${pullId}`);
+    }
     d.prepare(`UPDATE pulls SET status = 'ship_requested' WHERE id = ?`).run(pullId);
     d.prepare(`UPDATE watches SET status = 'ship_pending' WHERE id = ?`).run(p.watch_id);
     d.prepare(`INSERT INTO shipments(user_id, watch_id, source, source_id, name, line1, line2, city, state, zip, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)

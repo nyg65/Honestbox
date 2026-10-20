@@ -215,6 +215,9 @@ function migrate(d: DatabaseSync) {
   if (!cols.includes('referral_code')) d.exec(`ALTER TABLE users ADD COLUMN referral_code TEXT`);
   if (!cols.includes('referred_by')) d.exec(`ALTER TABLE users ADD COLUMN referred_by INTEGER REFERENCES users(id)`);
   d.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ref ON users(referral_code)`);
+  const pcols = (d.prepare(`PRAGMA table_info(pulls)`).all() as { name: string }[]).map((c) => c.name);
+  if (!pcols.includes('locked_cents')) d.exec(`ALTER TABLE pulls ADD COLUMN locked_cents INTEGER`);
+  if (!pcols.includes('locked_at')) d.exec(`ALTER TABLE pulls ADD COLUMN locked_at TEXT`);
 }
 
 function fillReferralCodes(d: DatabaseSync) {
@@ -237,10 +240,13 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   buyback_credit_bp: '9000',    // 90% of market value as HonestBox credit
   buyback_cash_bp: '8500',      // 85% of market value as cash
   cash_id_threshold_cents: '250000', // cash payouts over $2,500 need a verified ID
-  hold_days: '30',              // days a pull can sit in the vault before the customer must choose
+  hold_days: '180',             // days a pull can sit in a customer's vault; at the end it is sold back for credit at that day's value
+  lock_enabled: '1',            // customers may lock in today's value instead of floating with the market
   drop_hold_minutes: '10',
   excluded_states: 'WA,ID,MI,NV,CT', // placeholder list until the attorney's opinion
   min_age: '18',
+  ship_fee_cents: '1500',           // shipping fee charged on pulls worth less than the threshold below
+  ship_fee_under_cents: '25000',    // pulls under $250 pay the fee; pulls at or above ship free
   aff_l1_bp: '500',                 // level 1: 5% of a referred customer's box purchases
   aff_l2_bp: '100',                 // level 2: 1% on customers referred by your referrals
   aff_window_days: '90',            // commissions only on a customer's first 90 days
@@ -283,6 +289,10 @@ function seedIfEmpty(d: DatabaseSync) {
       promaster: ['Citizen', 'Promaster Dive', 'BN0151-09L', 2022, 44, 22500],
       bambino: ['Orient', 'Bambino V2', 'FAC00009N0', 2023, 41, 11600],
       snk: ['Seiko', 'SNK809', 'SNK809', 2021, 37, 11600],
+      gshock: ['Casio', 'G-Shock DW5600', 'DW5600E-1V', 2024, 43, 6600],
+      timex: ['Timex', 'Weekender Chronograph', 'TW2R42600', 2023, 40, 6600],
+      kamasu: ['Orient', 'Kamasu', 'RA-AA0003R', 2023, 42, 15800],
+      presage: ['Seiko', 'Presage Cocktail Time', 'SRPB43', 2022, 41, 29500],
     } as const;
     const add = (key: keyof typeof W, bandId: number | bigint, n: number) => {
       const [brand, model, ref, year, size, mkt] = W[key];
@@ -292,28 +302,46 @@ function seedIfEmpty(d: DatabaseSync) {
       }
     };
 
-    // The Railsplitter, $250, published edge 20%
-    const b1 = box.run('railsplitter', 'The Railsplitter', 'I', 'Seiko, Hamilton, Tissot and up', 25000, 1).lastInsertRowid;
-    add('speedy', band.run(b1, 'Omega Speedmaster Professional', 800000, 2000, 1).lastInsertRowid, 1);
-    add('bb58', band.run(b1, 'Tudor Black Bay 58', 350000, 10000, 2).lastInsertRowid, 2);
-    const r3 = band.run(b1, 'Hamilton, Tissot', 70000, 60000, 3).lastInsertRowid; add('prx', r3, 3); add('khaki', r3, 3);
-    const r4 = band.run(b1, 'Seiko, Orient', 11600, 928000, 4).lastInsertRowid; add('snk', r4, 10); add('bambino', r4, 10);
+    // Five boxes, each with a published house edge of about 20%. Named for Lincoln's path: rail-splitter,
+    // postmaster of New Salem, lawyer, statesman, president. Bands are rolled top to bottom.
 
-    // The Statesman, $750
-    const b2 = box.run('statesman', 'The Statesman', 'II', 'Top pull: Rolex Submariner Date', 75000, 2).lastInsertRowid;
-    add('sub', band.run(b2, 'Rolex Submariner Date', 1500000, 4000, 1).lastInsertRowid, 1);
-    add('speedy', band.run(b2, 'Omega Speedmaster Professional', 800000, 12000, 2).lastInsertRowid, 2);
-    add('bb58', band.run(b2, 'Tudor Black Bay 58', 350000, 40000, 3).lastInsertRowid, 3);
-    const s4 = band.run(b2, 'Hamilton, Tissot', 70000, 200000, 4).lastInsertRowid; add('prx', s4, 4); add('jazz', s4, 4);
-    const s5 = band.run(b2, 'Seiko, Citizen', 22100, 744000, 5).lastInsertRowid; add('seiko5', s5, 10); add('promaster', s5, 10);
+    // I. The Railsplitter, $100
+    const b1 = box.run('railsplitter', 'The Railsplitter', 'I', 'Casio and Timex, with a shot at a Tudor', 10000, 1).lastInsertRowid;
+    add('bb58', band.run(b1, 'Tudor Black Bay 58', 350000, 500, 1).lastInsertRowid, 1);
+    const i2 = band.run(b1, 'Hamilton, Tissot', 70000, 10000, 2).lastInsertRowid; add('prx', i2, 2); add('khaki', i2, 2);
+    const i3 = band.run(b1, 'Seiko, Citizen', 22100, 40000, 3).lastInsertRowid; add('seiko5', i3, 4); add('promaster', i3, 4);
+    const i4 = band.run(b1, 'Casio, Timex', 6600, 949500, 4).lastInsertRowid; add('gshock', i4, 15); add('timex', i4, 15);
 
-    // The President, $2,000
-    const b3 = box.run('president', 'The President', 'III', '1 in 5 pulls is worth $3,500 or more', 200000, 3).lastInsertRowid;
-    add('sub', band.run(b3, 'Rolex Submariner Date', 1500000, 15000, 1).lastInsertRowid, 2);
-    add('speedy', band.run(b3, 'Omega Speedmaster Professional', 800000, 50000, 2).lastInsertRowid, 3);
-    add('bb58', band.run(b3, 'Tudor Black Bay 58', 350000, 140000, 3).lastInsertRowid, 5);
-    const p4 = band.run(b3, 'Hamilton, Tissot', 70000, 300000, 4).lastInsertRowid; add('prx', p4, 5); add('khaki', p4, 5);
-    add('gent', band.run(b3, 'Tissot Gentleman', 55500, 495000, 5).lastInsertRowid, 12);
+    // II. The Postmaster, $250
+    const b2 = box.run('postmaster', 'The Postmaster', 'II', 'Seiko, Hamilton, Tissot and up', 25000, 2).lastInsertRowid;
+    add('speedy', band.run(b2, 'Omega Speedmaster Professional', 800000, 2000, 1).lastInsertRowid, 1);
+    add('bb58', band.run(b2, 'Tudor Black Bay 58', 350000, 10000, 2).lastInsertRowid, 2);
+    const ii3 = band.run(b2, 'Hamilton, Tissot', 70000, 60000, 3).lastInsertRowid; add('prx', ii3, 3); add('khaki', ii3, 3);
+    const ii4 = band.run(b2, 'Seiko, Orient', 11600, 928000, 4).lastInsertRowid; add('snk', ii4, 10); add('bambino', ii4, 10);
+
+    // III. The Counselor, $500
+    const b3 = box.run('counselor', 'The Counselor', 'III', 'Top pull: Rolex Submariner Date', 50000, 3).lastInsertRowid;
+    add('sub', band.run(b3, 'Rolex Submariner Date', 1500000, 2000, 1).lastInsertRowid, 1);
+    add('speedy', band.run(b3, 'Omega Speedmaster Professional', 800000, 6000, 2).lastInsertRowid, 1);
+    add('bb58', band.run(b3, 'Tudor Black Bay 58', 350000, 30000, 3).lastInsertRowid, 2);
+    const iii4 = band.run(b3, 'Hamilton, Tissot', 70000, 120000, 4).lastInsertRowid; add('prx', iii4, 3); add('jazz', iii4, 3);
+    add('kamasu', band.run(b3, 'Orient, Seiko', 15800, 842000, 5).lastInsertRowid, 15);
+
+    // IV. The Statesman, $1,000
+    const b4 = box.run('statesman', 'The Statesman', 'IV', 'Top pull: Rolex Submariner Date', 100000, 4).lastInsertRowid;
+    add('sub', band.run(b4, 'Rolex Submariner Date', 1500000, 6000, 1).lastInsertRowid, 1);
+    add('speedy', band.run(b4, 'Omega Speedmaster Professional', 800000, 16000, 2).lastInsertRowid, 2);
+    add('bb58', band.run(b4, 'Tudor Black Bay 58', 350000, 60000, 3).lastInsertRowid, 3);
+    const iv4 = band.run(b4, 'Hamilton, Tissot', 70000, 250000, 4).lastInsertRowid; add('prx', iv4, 4); add('jazz', iv4, 4);
+    add('presage', band.run(b4, 'Seiko Presage', 29500, 668000, 5).lastInsertRowid, 12);
+
+    // V. The President, $2,000
+    const b5 = box.run('president', 'The President', 'V', '1 in 5 pulls is worth $3,500 or more', 200000, 5).lastInsertRowid;
+    add('sub', band.run(b5, 'Rolex Submariner Date', 1500000, 15000, 1).lastInsertRowid, 2);
+    add('speedy', band.run(b5, 'Omega Speedmaster Professional', 800000, 50000, 2).lastInsertRowid, 3);
+    add('bb58', band.run(b5, 'Tudor Black Bay 58', 350000, 140000, 3).lastInsertRowid, 5);
+    const v4 = band.run(b5, 'Hamilton, Tissot', 70000, 300000, 4).lastInsertRowid; add('prx', v4, 5); add('khaki', v4, 5);
+    add('gent', band.run(b5, 'Tissot Gentleman', 55500, 495000, 5).lastInsertRowid, 12);
 
     // Drop No. VII
     const start = new Date(); const end = new Date(Date.now() + 1000 * 60 * 60 * 62);

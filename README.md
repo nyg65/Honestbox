@@ -14,7 +14,7 @@ Needs Node.js 22.5 or newer (it uses Node's built-in SQLite).
 npm install
 npm run build
 npm start            # http://localhost:3000
-npm test             # 12 engine tests: odds, fairness, buybacks, drops, affiliates
+npm test             # 17 engine tests: odds, fairness, buybacks, vault values, shipping, drops, affiliates
 ```
 
 The database is created and filled with sample data on first start at `data/honestbox.db`.
@@ -29,14 +29,19 @@ Set `HB_DB_PATH` to put it elsewhere, and `HB_ADMIN_PASSWORD` before first start
 
 **Website and customer app** (works on phones; installable to the home screen)
 - Landing page, sign-up with age and state checks, sign-in
-- Three boxes (The Railsplitter, The Statesman, The President) with full odds tables, expected value and house edge
-- Stovepipe-hat reveal, sell-back as credit (90%) or cash (85%, owner-approved, ID needed above $2,500), insured shipping requests
+- Five boxes, each with a published house edge of about 20%, full odds tables and expected value:
+  I The Railsplitter $100 · II The Postmaster $250 · III The Counselor $500 · IV The Statesman $1,000 · V The President $2,000
+- Stovepipe-hat reveal, then: sell back now as credit (market value minus 10%) or cash (85%, owner-approved, ID needed above $2,500), or ship insured
+  (free for watches worth $250 or more; $15 below that, paid from credit)
+- Vault values: a watch kept in the vault floats with the market, so the buyback is the market value on the day of sale minus 10%.
+  Customers can instead lock in today's value (permanent: protected if prices fall, no gain if they rise).
+  After 180 days a vault pull is sold back for credit at that day's value.
 - Weekly drops with a 10-minute checkout hold
 - My vault, account with credit history, the Honest Ledger (actual pulls against published odds), provably fair page with an in-browser verifier
 - Two-level affiliate program: 5% of a referred customer's boxes for 90 days, 1% at level two, 30-day clearing, $2,500 monthly cap, no self-referrals, FTC disclosure reminder
 
 **Admin console** (`/admin`)
-- Overview: sales, credit owed to customers, buyback exposure, payouts waiting, items to ship
+- Overview: sales, credit owed to customers, buyback exposure, locked values against market, payouts waiting, items to ship
 - Inventory: add watches, set market values, move watches between the vault and box bands
 - Box editor with live odds total, expected value and house edge; refuses odds that don't add up to 100%
 - Cash payout approvals, shipping queue with tracking, drops, settings, affiliate leaderboard, manual credit (free entries), ID verification, audit log

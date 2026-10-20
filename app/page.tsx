@@ -70,15 +70,16 @@ export default async function Landing() {
           <h2 style={{ fontSize: '2.5rem' }}>The boxes</h2>
           <span className="muted">Full odds on every box page.</span>
         </div>
-        <div className="grid">
+        <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
           {boxes.map((b) => (
-            <Link key={b.id} href={`/boxes/${b.slug}`} className={b.slug === featured.slug ? 'cert stack' : 'card stack'} style={{ textDecoration: 'none', color: 'var(--ivory)', gap: 14 }}>
+            <Link key={b.id} href={`/boxes/${b.slug}`} className={b.slug === featured.slug ? 'cert stack' : 'card stack'} style={{ textDecoration: 'none', color: 'var(--ivory)', gap: 10, padding: 18 }}>
               <span className="eyebrow" style={{ color: b.slug === featured.slug ? 'var(--brass)' : 'var(--muted)' }}>Box {b.numeral}</span>
-              <div className="between"><span className="serif" style={{ fontWeight: 700, fontSize: '1.6rem' }}>{b.name}</span><span className="mono" style={{ fontSize: '1.25rem' }}>{usd(b.price_cents)}</span></div>
+              <span className="serif" style={{ fontWeight: 700, fontSize: '1.35rem' }}>{b.name}</span>
+              <span className="mono" style={{ fontSize: '1.6rem' }}>{usd(b.price_cents)}</span>
               <hr className="rule" />
-              <div className="between"><span className="muted">Top pull</span><span className="mono">{usd(b.top.value_cents)} · {oneIn(b.top.odds_ppm)}</span></div>
-              <div className="between"><span className="muted">$3,500 or more</span><span className="mono">{oneIn(b.big)}</span></div>
-              <div className="between"><span className="muted">Expected value</span><span className="mono">{usd(b.ev)}</span></div>
+              <span className="stack" style={{ gap: 0 }}><span className="muted" style={{ fontSize: '0.8rem' }}>Top pull</span><span className="mono brass">{usd(b.top.value_cents)}</span><span className="mono" style={{ fontSize: '0.85rem' }}>{oneIn(b.top.odds_ppm)}</span></span>
+              <span className="stack" style={{ gap: 0 }}><span className="muted" style={{ fontSize: '0.8rem' }}>$3,500 or more</span><span className="mono">{oneIn(b.big)}</span></span>
+              <span className="stack" style={{ gap: 0 }}><span className="muted" style={{ fontSize: '0.8rem' }}>Expected value</span><span className="mono">{usd(b.ev)}</span></span>
             </Link>
           ))}
         </div>

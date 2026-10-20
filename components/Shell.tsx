@@ -1,13 +1,13 @@
 import Link from 'next/link';
 import { currentUser } from '@/lib/auth.ts';
-import { balance, settings, flag } from '@/lib/engine.ts';
+import { balance, settings, flag, expireHolds } from '@/lib/engine.ts';
 import { usd } from '@/lib/money.ts';
 import { settleCommissions } from '@/lib/affiliate.ts';
 import { Mark } from './Mark.tsx';
 
 export async function Shell({ children, tab }: { children: React.ReactNode; tab?: 'boxes' | 'drops' | 'vault' | 'account' }) {
   const user = await currentUser();
-  if (user) settleCommissions(user.id);
+  if (user) { settleCommissions(user.id); expireHolds(user.id); }
   const s = settings();
   const bal = user ? balance(user.id) : 0;
   return (

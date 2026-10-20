@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { Shell, Flash } from '@/components/Shell.tsx';
 import { requireUser } from '@/lib/auth.ts';
-import { getPull, buybackQuote, settings, num } from '@/lib/engine.ts';
+import { getPull, buybackQuote, settings, num, valueBasis } from '@/lib/engine.ts';
 import { usd } from '@/lib/money.ts';
 import { sellBackAction } from '../../../actions.ts';
 
@@ -15,7 +15,7 @@ export default async function Sell({ params, searchParams }: { params: Promise<{
   if (!p) notFound();
   if (p.status !== 'vault') redirect(`/pulls/${id}`);
   const s = settings();
-  const q = buybackQuote(p.market_cents, s);
+  const q = buybackQuote(valueBasis(p), s);
   const needsId = q.cash > num(s, 'cash_id_threshold_cents') && !user.id_verified;
 
   return (
@@ -30,7 +30,10 @@ export default async function Sell({ params, searchParams }: { params: Promise<{
         <Flash sp={sp} />
         <div className="cert stack" style={{ gap: 10 }}>
           <span className="italic brass">The honest math, in full</span>
-          <div className="between"><span className="muted">Market value</span><span className="mono">{usd(p.market_cents)}</span></div>
+          <div className="between"><span className="muted">Value when you pulled it</span><span className="mono">{usd(p.value_cents)}</span></div>
+          <div className="between"><span className="muted">Market value today</span><span className="mono">{usd(p.market_cents)}</span></div>
+          {p.locked_cents != null && <div className="between"><span className="muted">Your locked value</span><span className="mono brass">{usd(p.locked_cents)}</span></div>}
+          <div className="between"><span className="muted">Buyback is based on</span><span className="mono">{p.locked_cents != null ? 'locked value' : "today's value"}</span></div>
           {p.sales_count > 0 && <div className="between"><span className="muted">Recent sales range</span><span className="mono">{usd(p.sales_low_cents!)} – {usd(p.sales_high_cents!)}</span></div>}
           {p.sales_count > 0 && <div className="between"><span className="muted">Sales used</span><span className="mono">{p.sales_count}</span></div>}
         </div>

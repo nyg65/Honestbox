@@ -25,7 +25,8 @@ export default async function Legal({ params }: { params: Promise<{ page: string
         {page === 'free-entry' && <p>[Attorney to write: the free, no-purchase way to enter, such as a mailed request, with limits per person and the same odds as a paid entry.]</p>}
         {page === 'buyback' && <>
           <p>You can sell any pull back while it is in your vault: {num(s, 'buyback_credit_bp') / 100}% of its market value as HonestBox credit, paid instantly, or {num(s, 'buyback_cash_bp') / 100}% as cash after review.</p>
-          <p>Cash payouts over {usd(num(s, 'cash_id_threshold_cents'))} need a verified ID. You have {num(s, 'hold_days')} days from a pull to sell it back or ship it.</p>
+          <p>While a watch is in your vault, its buyback follows the market: the payout uses the market value on the day you sell, so if the watch rises, your payout rises, and if it falls, your payout falls. You can instead lock in the value on any day; a locked value is permanent and does not change with the market.</p>
+          <p>Cash payouts over {usd(num(s, 'cash_id_threshold_cents'))} need a verified ID. You have {num(s, 'hold_days')} days from a pull to sell it back or ship it. After that, we buy it back for credit at that day&apos;s value (or your locked value).</p>
         </>}
         {page === 'terms' && <p>[Attorney to write.]</p>}
         {page === 'privacy' && <p>[Attorney to write. HonestBox stores your name, email, state, shipping addresses and your credit history. It does not sell personal data.]</p>}

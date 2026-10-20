@@ -13,8 +13,10 @@ const FIELDS: [string, string, string][] = [
   ['buyback_credit_bp', 'Buyback as credit', 'basis points: 9000 = 90%'],
   ['buyback_cash_bp', 'Buyback as cash', 'basis points: 8500 = 85%'],
   ['cash_id_threshold_cents', 'Cash payouts above this need an ID', 'cents: 250000 = $2,500'],
-  ['hold_days', 'Days a pull can stay in a customer vault', ''],
+  ['hold_days', 'Days a pull can stay in a customer vault', 'after this it is sold back for credit at that day\'s value'],
   ['drop_hold_minutes', 'Drop checkout hold', 'minutes'],
+  ['ship_fee_cents', 'Shipping fee on low-value pulls', 'cents: 1500 = $15'],
+  ['ship_fee_under_cents', 'Pulls worth less than this pay the fee', 'cents: 25000 = $250'],
   ['excluded_states', 'States where boxes are closed', 'comma-separated; set from the attorney\'s opinion'],
   ['min_age', 'Minimum age', ''],
   ['aff_l1_bp', 'Affiliate level 1', 'basis points of box price: 500 = 5%'],
@@ -37,6 +39,7 @@ export default async function AdminSettings({ searchParams }: { searchParams: Pr
         <Flash sp={sp} />
         <form action={adminSettings} className="card stack">
           <label className="check" htmlFor="boxes_enabled"><input id="boxes_enabled" name="boxes_enabled" type="checkbox" defaultChecked={flag(s, 'boxes_enabled')} /> Mystery boxes are open (turn off to run drops only)</label>
+          <label className="check" htmlFor="lock_enabled"><input id="lock_enabled" name="lock_enabled" type="checkbox" defaultChecked={flag(s, 'lock_enabled')} /> Customers can lock in today&apos;s value (protects them if prices fall)</label>
           <label className="check" htmlFor="real_money"><input id="real_money" name="real_money" type="checkbox" defaultChecked={flag(s, 'real_money')} /> Real payments (needs a connected payment processor)</label>
           <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14 }}>
             {FIELDS.map(([k, label, hint]) => (

@@ -20,6 +20,7 @@ export default async function Admin() {
     ['Sales, last 30 days', usd(m.sales30)], ['Pulls, last 30 days', m.pulls30.toLocaleString('en-US')],
     ['Customer credit outstanding', usd(m.creditOutstanding), 'What you owe customers in credit'],
     ['Buyback exposure', usd(m.vaultExposure), 'If every pull in customer vaults were sold back for credit today'],
+    ['Locked values vs market', `${m.lockedCount} · ${m.lockedGap >= 0 ? '+' : ''}${usd(m.lockedGap)}`, 'Positive means customers locked above today\'s market: the cost of locks'],
     ['Cash payouts waiting', `${m.pendingPayouts} · ${usd(m.pendingPayoutCents)}`], ['Watches to ship', String(m.toShip)],
     ['Inventory at cost', usd(m.inventoryCost)], ['Customers', m.users.toLocaleString('en-US')],
   ];

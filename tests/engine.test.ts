@@ -53,7 +53,7 @@ test('over 200,000 rolls, each band appears close to its published odds', () => 
 test('opening a box charges the price, records a verifiable pull and moves the watch', () => {
   const uid = demo(); const before = E.balance(uid);
   const pid = E.openBox(uid, 'statesman');
-  assert.equal(E.balance(uid), before - 75000);
+  assert.equal(E.balance(uid), before - 100000);
   const p = E.getPull(uid, pid)!;
   assert.equal(p.status, 'vault');
   assert.equal(fair.hashSeed(p.server_seed), p.server_hash);
@@ -144,15 +144,15 @@ test('two-level commissions: 5% to the referrer, 1% to theirs, cleared into cred
   E.addTestCredit(c, 500000);
   const pid = E.openBox(c, 'statesman');
   const rows = db().prepare('SELECT earner_id, level, amount_cents, status FROM commissions WHERE pull_id = ? ORDER BY level').all(pid) as { earner_id: number; level: number; amount_cents: number; status: string }[];
-  assert.deepEqual(rows.map((r) => [r.earner_id, r.level, r.amount_cents, r.status]), [[b, 1, 3750, 'pending'], [a, 2, 750, 'pending']]);
+  assert.deepEqual(rows.map((r) => [r.earner_id, r.level, r.amount_cents, r.status]), [[b, 1, 5000, 'pending'], [a, 2, 1000, 'pending']]);
   const before = E.balance(b);
   AF.settleCommissions(b);
   assert.equal(E.balance(b), before, 'not spendable until the clearing period ends');
   db().prepare(`UPDATE commissions SET available_at = '2000-01-01' WHERE earner_id = ?`).run(b);
   AF.settleCommissions(b);
-  assert.equal(E.balance(b), before + 3750);
+  assert.equal(E.balance(b), before + 5000);
   AF.settleCommissions(b);
-  assert.equal(E.balance(b), before + 3750, 'settling twice pays once');
+  assert.equal(E.balance(b), before + 5000, 'settling twice pays once');
   // the referrer's own boxes earn nothing for themselves, and nobody above a (there is no one)
   E.addTestCredit(b, 100000);
   const own = E.openBox(b, 'railsplitter');
@@ -173,4 +173,74 @@ test('commissions respect the monthly cap and the 90-day window', () => {
   E.addTestCredit(old, 100000);
   const pid = E.openBox(old, 'railsplitter');
   assert.equal((db().prepare('SELECT COUNT(*) AS n FROM commissions WHERE pull_id = ?').get(pid) as { n: number }).n, 0);
+});
+
+test('five boxes at $100, $250, $500, $1,000 and $2,000', () => {
+  assert.deepEqual(E.listBoxes().map((b) => [b.numeral, b.slug, b.price_cents]),
+    [['I', 'railsplitter', 10000], ['II', 'postmaster', 25000], ['III', 'counselor', 50000], ['IV', 'statesman', 100000], ['V', 'president', 200000]]);
+});
+
+test('shipping a pull under $250 costs $15 from credit; $250 and up ships free', () => {
+  const u = newUser('ship-fee@test.dev'); E.addTestCredit(u, 1_000_000);
+  const addr = { name: 'S', line1: '1 Main St', city: 'Austin', state: 'TX', zip: '78701' };
+  const box = E.getBox('railsplitter')!; const bands = E.bandsFor(box.id);
+  const force = (i: number) => A.saveBox(adminId(), box.id, box.price_cents, true, bands.map((b, j) => ({ ...b, odds_ppm: j === i ? fair.PPM : 0 })));
+  force(bands.length - 1); // Casio, Timex band ($66)
+  const cheap = E.openBox(u, 'railsplitter');
+  let before = E.balance(u);
+  E.requestShip(u, cheap, addr);
+  assert.equal(E.balance(u), before - 1500);
+  force(1); // Hamilton, Tissot band ($700)
+  const dear = E.openBox(u, 'railsplitter');
+  before = E.balance(u);
+  E.requestShip(u, dear, addr);
+  assert.equal(E.balance(u), before);
+  A.saveBox(adminId(), box.id, box.price_cents, true, bands);
+  // not enough credit for the fee: refused, nothing changes
+  const poor = newUser('ship-poor@test.dev'); E.addTestCredit(poor, 10000);
+  force(bands.length - 1);
+  const p2 = E.openBox(poor, 'railsplitter');
+  assert.throws(() => E.requestShip(poor, p2, addr), /Shipping this watch costs \$15/);
+  assert.equal(E.getPull(poor, p2)!.status, 'vault');
+  A.saveBox(adminId(), box.id, box.price_cents, true, bands);
+});
+
+test('vault pulls float with the market: the buyback uses the market value on the day of sale', () => {
+  const u = newUser('float@test.dev'); E.addTestCredit(u, 500_000);
+  const pid = E.openBox(u, 'counselor');
+  const p = E.getPull(u, pid)!;
+  A.updateMarketValue(adminId(), p.watch_id, Math.round(p.market_cents * 1.2)); // the watch goes up 20%
+  const before = E.balance(u);
+  const paid = E.sellBack(u, pid, 'credit');
+  assert.equal(paid, Math.floor(Math.round(p.market_cents * 1.2) * 0.9));
+  assert.equal(E.balance(u), before + paid);
+  A.updateMarketValue(adminId(), p.watch_id, p.market_cents);
+});
+
+test('a locked value is paid even if the market falls, gains nothing if it rises, and cannot be locked twice', () => {
+  const u = newUser('lock@test.dev'); E.addTestCredit(u, 500_000);
+  const a = E.openBox(u, 'counselor'); const pa = E.getPull(u, a)!;
+  assert.equal(E.lockValue(u, a), pa.market_cents);
+  assert.throws(() => E.lockValue(u, a), /already locked/);
+  A.updateMarketValue(adminId(), pa.watch_id, Math.round(pa.market_cents * 0.5)); // price halves
+  assert.equal(E.sellBack(u, a, 'credit'), Math.floor(pa.market_cents * 0.9));
+  A.updateMarketValue(adminId(), pa.watch_id, pa.market_cents);
+
+  const b = E.openBox(u, 'counselor'); const pb = E.getPull(u, b)!;
+  E.lockValue(u, b);
+  A.updateMarketValue(adminId(), pb.watch_id, pb.market_cents * 2); // price doubles
+  assert.equal(E.sellBack(u, b, 'credit'), Math.floor(pb.market_cents * 0.9));
+  A.updateMarketValue(adminId(), pb.watch_id, pb.market_cents);
+});
+
+test('when vault time runs out, the pull is sold back for credit at that day\'s value', () => {
+  const u = newUser('expire@test.dev'); E.addTestCredit(u, 500_000);
+  const pid = E.openBox(u, 'counselor'); const p = E.getPull(u, pid)!;
+  db().prepare(`UPDATE pulls SET hold_until = '2000-01-01' WHERE id = ?`).run(pid);
+  const before = E.balance(u);
+  E.expireHolds(u);
+  assert.equal(E.getPull(u, pid)!.status, 'sold_back');
+  assert.equal(E.balance(u), before + Math.floor(p.market_cents * 0.9));
+  E.expireHolds(u);
+  assert.equal(E.balance(u), before + Math.floor(p.market_cents * 0.9), 'only once');
 });

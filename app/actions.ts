@@ -66,6 +66,13 @@ export async function sellBackAction(f: FormData) {
   back(`/pulls/${id}`, 'ok', method === 'credit' ? `${usd(amt)} added to your credit.` : `${usd(amt)} cash payout requested. We'll confirm by email once it's approved.`);
 }
 
+export async function lockAction(f: FormData) {
+  const id = int(f, 'pull');
+  const u = await requireUser(`/pulls/${id}`);
+  const v = attempt(`/pulls/${id}`, () => E.lockValue(u.id, id));
+  back(`/pulls/${id}`, 'ok', `Locked at ${usd(v)}. Sell it back any time for the locked value minus 10%, even if the market falls.`);
+}
+
 export async function shipAction(f: FormData) {
   const id = int(f, 'pull');
   const u = await requireUser(`/pulls/${id}/ship`);
@@ -157,6 +164,7 @@ export async function adminSettings(f: FormData) {
   for (const [k, val] of f.entries()) if (typeof val === 'string') v[k] = val;
   v.boxes_enabled = f.get('boxes_enabled') === 'on' ? '1' : '0';
   v.real_money = f.get('real_money') === 'on' ? '1' : '0';
+  v.lock_enabled = f.get('lock_enabled') === 'on' ? '1' : '0';
   if (v.real_money === '1') back('/admin/settings', 'error', 'Real payments cannot be switched on until a payment processor is connected.');
   attempt('/admin/settings', () => A.saveSettings(me.id, v));
   revalidatePath('/', 'layout');

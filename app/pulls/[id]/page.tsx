@@ -4,9 +4,9 @@ import { Shell, Flash } from '@/components/Shell.tsx';
 import { WatchArt, artFor } from '@/components/Mark.tsx';
 import { Reveal } from '@/components/Reveal.tsx';
 import { requireUser } from '@/lib/auth.ts';
-import { getPull, buybackQuote, settings } from '@/lib/engine.ts';
+import { getPull, buybackQuote, settings, shipFee, valueBasis, flag } from '@/lib/engine.ts';
 import { usd, oneIn } from '@/lib/money.ts';
-import { revealAction } from '../../actions.ts';
+import { revealAction, lockAction } from '../../actions.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,10 @@ export default async function PullPage({ params, searchParams }: { params: Promi
   const user = await requireUser(`/pulls/${id}`);
   const p = getPull(user.id, Number(id));
   if (!p) notFound();
-  const q = buybackQuote(p.market_cents, settings());
+  const s = settings();
+  const q = buybackQuote(valueBasis(p), s);
+  const change = p.market_cents - p.value_cents;
+  const changePct = p.value_cents ? (change / p.value_cents) * 100 : 0;
   const daysLeft = Math.max(0, Math.ceil((Date.parse(p.hold_until) - Date.now()) / 86400_000));
   const art = artFor(p.brand);
   const reveal = revealAction.bind(null, p.id);
@@ -28,7 +31,7 @@ export default async function PullPage({ params, searchParams }: { params: Promi
         <Reveal revealed={!!p.revealed} onReveal={reveal}>
           <div className="stack" style={{ gap: 18 }}>
             <div className="cert stack" style={{ alignItems: 'center', gap: 14, textAlign: 'center', padding: '24px 20px' }}>
-              <span className="pill pill-brass">{oneIn(p.band_odds)} pull</span>
+              <span className="pill pill-brass">{p.band_odds >= 500_000 ? 'Most common pull' : `${oneIn(p.band_odds)} pull`}</span>
               <WatchArt size={150} dial={art.dial} bezel={art.bezel} />
               <div className="stack" style={{ gap: 4 }}>
                 <h1 style={{ fontSize: '2rem' }}>{p.brand} {p.model}</h1>
@@ -37,16 +40,44 @@ export default async function PullPage({ params, searchParams }: { params: Promi
               <div className="stack" style={{ gap: 2 }}>
                 <span className="mono brass" style={{ fontSize: '1.9rem' }}>{usd(p.market_cents)}</span>
                 <span className="muted" style={{ fontSize: '0.85rem' }}>
-                  {p.sales_count ? `Average of ${p.sales_count} recent sales, ${usd(p.sales_low_cents!)} to ${usd(p.sales_high_cents!)}` : 'Average of recent verified sales'}
+                  {p.sales_count ? `Today's value: average of ${p.sales_count} recent sales, ${usd(p.sales_low_cents!)} to ${usd(p.sales_high_cents!)}` : "Today's market value"}
                 </span>
+                {change !== 0 && (
+                  <span className="mono" style={{ fontSize: '0.85rem', color: change > 0 ? 'var(--good)' : 'var(--bad)' }}>
+                    {change > 0 ? '▲' : '▼'} {usd(Math.abs(change))} ({changePct > 0 ? '+' : ''}{changePct.toFixed(1)}%) since you pulled it at {usd(p.value_cents)}
+                  </span>
+                )}
               </div>
             </div>
 
             {p.status === 'vault' && (
               <div className="stack" style={{ gap: 10 }}>
-                <Link href={`/pulls/${p.id}/sell`} className="btn btn-gold btn-block" style={{ justifyContent: 'space-between' }}><span>Sell it back</span><span className="mono">up to {usd(q.credit)}</span></Link>
-                <Link href={`/pulls/${p.id}/ship`} className="btn btn-block" style={{ justifyContent: 'space-between' }}><span>Ship it to me</span><span className="muted" style={{ fontWeight: 400, fontSize: '0.9rem' }}>Insured, 3–5 days</span></Link>
-                <Link href="/vault" className="btn btn-block" style={{ border: 0, color: 'var(--muted)' }}>Keep in my vault ({daysLeft} days left to decide)</Link>
+                <Link href={`/pulls/${p.id}/sell`} className="btn btn-gold btn-block" style={{ justifyContent: 'space-between' }}><span>Sell it back now</span><span className="mono">{usd(q.credit)}</span></Link>
+                <Link href={`/pulls/${p.id}/ship`} className="btn btn-block" style={{ justifyContent: 'space-between' }}><span>Ship it to me</span><span className="muted" style={{ fontWeight: 400, fontSize: '0.9rem' }}>{shipFee(p.market_cents, s) ? `${usd(shipFee(p.market_cents, s))} · insured` : 'Free · insured, 3–5 days'}</span></Link>
+
+                <div className="card stack" style={{ gap: 10 }}>
+                  <span className="serif" style={{ fontWeight: 700, fontSize: '1.2rem' }}>Keep it in your vault</span>
+                  {p.locked_cents == null ? (
+                    <>
+                      <p className="muted" style={{ fontSize: '0.9rem', lineHeight: 1.55 }}>
+                        Its buyback follows the market. Whenever you sell, you get the market value that day minus 10%. If the watch goes up, so does your payout. You have {daysLeft} days; after that we buy it back for credit at that day&apos;s value.
+                      </p>
+                      {flag(s, 'lock_enabled') && (
+                        <form action={lockAction} className="stack" style={{ gap: 6 }}>
+                          <input type="hidden" name="pull" value={p.id} />
+                          <button className="btn btn-block" style={{ justifyContent: 'space-between' }}><span>Lock in today&apos;s value</span><span className="mono">{usd(p.market_cents)}</span></button>
+                          <span className="quiet" style={{ fontSize: '0.8rem' }}>Locking is permanent: you&apos;re protected if the price falls, but you won&apos;t gain if it rises.</span>
+                        </form>
+                      )}
+                      <Link href="/vault" className="btn btn-block" style={{ border: 0, color: 'var(--muted)', minHeight: 40 }}>Keep it floating</Link>
+                    </>
+                  ) : (
+                    <p className="muted" style={{ fontSize: '0.9rem', lineHeight: 1.55 }}>
+                      <span className="pill pill-brass" style={{ marginRight: 8 }}>Locked</span>
+                      Value locked at <span className="mono" style={{ color: 'var(--ivory)' }}>{usd(p.locked_cents)}</span> on {new Date(p.locked_at!).toLocaleDateString('en-US', { dateStyle: 'medium' })}. Sell it back any time in the next {daysLeft} days for {usd(q.credit)} in credit, whatever the market does.
+                    </p>
+                  )}
+                </div>
               </div>
             )}
             {p.status === 'sold_back' && <p className="card">You sold this pull back. <Link href="/account">See your credit</Link></p>}

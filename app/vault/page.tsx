@@ -13,14 +13,14 @@ const LABEL: Record<string, string> = { vault: 'In your vault', sold_back: 'Sold
 export default async function Vault({ searchParams }: { searchParams: Promise<Record<string, string>> }) {
   const sp = await searchParams;
   const user = await requireUser('/vault');
-  const pulls = db().prepare(`SELECT p.id, p.status, p.revealed, p.hold_until, p.created_at, w.brand, w.model, w.market_cents, b.name AS box_name
+  const pulls = db().prepare(`SELECT p.id, p.status, p.revealed, p.hold_until, p.created_at, p.value_cents, p.locked_cents, w.brand, w.model, w.market_cents, b.name AS box_name
     FROM pulls p JOIN watches w ON w.id = p.watch_id JOIN boxes b ON b.id = p.box_id WHERE p.user_id = ? ORDER BY p.id DESC LIMIT 100`).all(user.id) as
-    { id: number; status: string; revealed: number; hold_until: string; created_at: string; brand: string; model: string; market_cents: number; box_name: string }[];
+    { id: number; status: string; revealed: number; hold_until: string; created_at: string; value_cents: number; locked_cents: number | null; brand: string; model: string; market_cents: number; box_name: string }[];
   const orders = db().prepare(`SELECT s.id, s.status, s.tracking, s.created_at, w.brand, w.model, i.price_cents FROM shipments s JOIN watches w ON w.id = s.watch_id
     JOIN drop_items i ON i.id = s.source_id WHERE s.user_id = ? AND s.source = 'drop' ORDER BY s.id DESC`).all(user.id) as
     { id: number; status: string; tracking: string | null; brand: string; model: string; price_cents: number }[];
   const held = pulls.filter((p) => p.status === 'vault');
-  const value = held.reduce((a, p) => a + p.market_cents, 0);
+  const value = held.reduce((a, p) => a + (p.locked_cents ?? p.market_cents), 0);
 
   return (
     <Shell tab="vault">
@@ -44,7 +44,14 @@ export default async function Vault({ searchParams }: { searchParams: Promise<Re
               <Link key={p.id} href={`/pulls/${p.id}`} className={p.status === 'vault' ? 'cert stack' : 'card stack'} style={{ textDecoration: 'none', color: 'var(--ivory)', alignItems: 'center', textAlign: 'center', gap: 8 }}>
                 {p.revealed ? <WatchArt size={90} dial={art.dial} bezel={art.bezel} /> : <span className="numeral" style={{ width: 90, height: 90, fontSize: '0.8rem' }}>Sealed</span>}
                 <span className="serif" style={{ fontWeight: 700, fontSize: '1.1rem' }}>{p.revealed ? `${p.brand} ${p.model}` : 'Not revealed yet'}</span>
-                <span className="mono brass">{p.revealed ? usd(p.market_cents) : '—'}</span>
+                <span className="mono brass">{p.revealed ? usd(p.locked_cents ?? p.market_cents) : '—'}</span>
+                {p.revealed && p.status === 'vault' ? (
+                  p.locked_cents != null
+                    ? <span className="pill pill-brass" style={{ fontSize: '0.7rem' }}>Locked</span>
+                    : p.market_cents !== p.value_cents
+                      ? <span className="mono" style={{ fontSize: '0.8rem', color: p.market_cents > p.value_cents ? 'var(--good)' : 'var(--bad)' }}>{p.market_cents > p.value_cents ? '▲' : '▼'} {(((p.market_cents - p.value_cents) / p.value_cents) * 100).toFixed(1)}% since pulled</span>
+                      : <span className="quiet" style={{ fontSize: '0.8rem' }}>Floating with the market</span>
+                ) : null}
                 <span className="muted" style={{ fontSize: '0.8rem' }}>{p.box_name} · {LABEL[p.status] || p.status}{p.status === 'vault' ? ` · ${days} days left` : ''}</span>
               </Link>
             );

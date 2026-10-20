@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { Shell, Flash } from '@/components/Shell.tsx';
 import { AddressFields } from '@/components/AddressFields.tsx';
 import { requireUser } from '@/lib/auth.ts';
-import { getPull } from '@/lib/engine.ts';
+import { getPull, settings, shipFee, buybackQuote, num } from '@/lib/engine.ts';
 import { usd } from '@/lib/money.ts';
 import { shipAction } from '../../../actions.ts';
 
@@ -15,17 +15,25 @@ export default async function Ship({ params, searchParams }: { params: Promise<{
   const p = getPull(user.id, Number(id));
   if (!p) notFound();
   if (p.status !== 'vault') redirect(`/pulls/${id}`);
+  const s = settings();
+  const fee = shipFee(p.market_cents, s);
+  const q = buybackQuote(p.market_cents, s);
   return (
     <Shell tab="vault">
       <div className="narrow page stack" style={{ gap: 20 }}>
         <Link href={`/pulls/${id}`} className="muted" style={{ textDecoration: 'none' }}>← Back to your pull</Link>
         <h1 style={{ fontSize: '2.1rem' }}>Ship your {p.brand} {p.model}</h1>
-        <p className="muted">Insured for its full value of {usd(p.market_cents)}, signature required. Free shipping in the US.</p>
+        <p className="muted">
+          Insured for its full value of {usd(p.market_cents)}, signature required.{' '}
+          {fee > 0
+            ? `Shipping is ${usd(fee)} for watches under ${usd(num(s, 'ship_fee_under_cents'))}, paid from your credit. Or sell it back for ${usd(q.credit)} in credit.`
+            : 'Free shipping in the US.'}
+        </p>
         <Flash sp={sp} />
         <form action={shipAction} className="stack">
           <input type="hidden" name="pull" value={p.id} />
           <AddressFields name={user.name} state={user.state} />
-          <button className="btn btn-gold btn-block">Ship it to me</button>
+          <button className="btn btn-gold btn-block">{fee > 0 ? `Ship it to me for ${usd(fee)}` : 'Ship it to me'}</button>
         </form>
       </div>
     </Shell>

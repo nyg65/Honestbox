@@ -14,7 +14,9 @@ export function dashboard() {
     sales30: one(`SELECT COALESCE(SUM(-amount_cents),0) AS v FROM ledger WHERE kind IN ('box_purchase','drop_purchase') AND created_at >= ?`, new Date(Date.now() - 30 * 86400_000).toISOString()),
     pulls30: one(`SELECT COUNT(*) AS v FROM pulls WHERE created_at >= ?`, new Date(Date.now() - 30 * 86400_000).toISOString()),
     creditOutstanding: one(`SELECT COALESCE(SUM(amount_cents),0) AS v FROM ledger`),
-    vaultExposure: Math.round(one(`SELECT COALESCE(SUM(w.market_cents),0) AS v FROM pulls p JOIN watches w ON w.id = p.watch_id WHERE p.status = 'vault'`) * credit),
+    vaultExposure: Math.round(one(`SELECT COALESCE(SUM(COALESCE(p.locked_cents, w.market_cents)),0) AS v FROM pulls p JOIN watches w ON w.id = p.watch_id WHERE p.status = 'vault'`) * credit),
+    lockedGap: one(`SELECT COALESCE(SUM(p.locked_cents - w.market_cents),0) AS v FROM pulls p JOIN watches w ON w.id = p.watch_id WHERE p.status = 'vault' AND p.locked_cents IS NOT NULL`),
+    lockedCount: one(`SELECT COUNT(*) AS v FROM pulls WHERE status = 'vault' AND locked_cents IS NOT NULL`),
     pendingPayouts: one(`SELECT COUNT(*) AS v FROM buybacks WHERE status = 'pending'`),
     pendingPayoutCents: one(`SELECT COALESCE(SUM(amount_cents),0) AS v FROM buybacks WHERE status = 'pending'`),
     toShip: one(`SELECT COUNT(*) AS v FROM shipments WHERE status = 'requested'`),
@@ -63,7 +65,8 @@ export function assignWatch(actorId: number, watchId: number, bandId: number | n
 export function updateMarketValue(actorId: number, watchId: number, cents: number) {
   if (!(cents > 0)) throw new UserError('Enter a market value above zero.');
   tx((d) => {
-    d.prepare('UPDATE watches SET market_cents = ? WHERE id = ?').run(cents, watchId);
+    // A hand-entered value replaces the sales-based one, so the old sales range no longer applies.
+    d.prepare('UPDATE watches SET market_cents = ?, sales_count = 0, sales_low_cents = NULL, sales_high_cents = NULL WHERE id = ?').run(cents, watchId);
     audit(d, actorId, 'watch.value', `#${watchId} = ${cents}`);
   });
 }
