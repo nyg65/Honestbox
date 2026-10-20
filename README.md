@@ -58,7 +58,7 @@ Set `HB_DB_PATH` to put it elsewhere, and `HB_ADMIN_PASSWORD` before first start
 `render.yaml` defines everything: one Node web service on the Starter plan with a 1 GB persistent disk at `/var/data` for the database.
 
 1. In Render, choose **New > Blueprint** and pick this GitHub repository.
-2. When asked for `HB_ADMIN_PASSWORD`, enter a strong password. It becomes the admin password on first start.
+2. Set `HB_ADMIN_PASSWORD` to a strong password of 12 or more characters. On Render there is no default: until it is set, the site runs with no admin account. Sign in as admin@honestbox.test with that password.
 3. Deploy. Every push to `main` redeploys automatically.
 
 The free plan has no disk, so it would erase every account and pull on each restart. Stay on Starter or higher.

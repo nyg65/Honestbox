@@ -18,6 +18,7 @@ export function db(): DatabaseSync {
     d.exec('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
     migrate(d);
     seedIfEmpty(d);
+    ensureAdmin(d);
     fillReferralCodes(d);
     g.__hbdb = d;
   }
@@ -220,6 +221,22 @@ function migrate(d: DatabaseSync) {
   if (!pcols.includes('locked_at')) d.exec(`ALTER TABLE pulls ADD COLUMN locked_at TEXT`);
 }
 
+/**
+ * Creates the admin account once. On a hosted server (Render sets RENDER) the password must come from
+ * HB_ADMIN_PASSWORD; there is no default, so a public site never runs with the sample password.
+ * Locally, without the variable, the sample password from the README is used.
+ */
+function ensureAdmin(d: DatabaseSync) {
+  if (d.prepare(`SELECT 1 FROM users WHERE role = 'admin'`).get()) return;
+  const pw = process.env.HB_ADMIN_PASSWORD || (process.env.RENDER ? '' : 'honest-abe-1860');
+  if (pw.length < 12) {
+    if (process.env.RENDER) console.warn('HonestBox: no admin account yet. Set HB_ADMIN_PASSWORD (12+ characters) in Render, then restart.');
+    return;
+  }
+  d.prepare(`INSERT INTO users(email, name, pass_hash, role, state, id_verified, created_at) VALUES (?,?,?,?,?,?,?)`)
+    .run('admin@honestbox.test', 'HonestBox Admin', hashPassword(pw), 'admin', 'TX', 1, now());
+}
+
 function fillReferralCodes(d: DatabaseSync) {
   const missing = d.prepare(`SELECT id FROM users WHERE referral_code IS NULL`).all() as { id: number }[];
   for (const u of missing) d.prepare(`UPDATE users SET referral_code = ? WHERE id = ?`).run(newReferralCode(d), u.id);
@@ -263,13 +280,10 @@ function seedIfEmpty(d: DatabaseSync) {
   const t = now();
   d.exec('BEGIN');
   try {
-    const admin = d.prepare(`INSERT INTO users(email, name, pass_hash, role, state, id_verified, created_at) VALUES (?,?,?,?,?,?,?)`)
-      .run('admin@honestbox.test', 'HonestBox Admin', hashPassword(process.env.HB_ADMIN_PASSWORD || 'honest-abe-1860'), 'admin', 'TX', 1, t);
     const demo = d.prepare(`INSERT INTO users(email, name, pass_hash, role, state, id_verified, created_at) VALUES (?,?,?,?,?,?,?)`)
       .run('demo@honestbox.test', 'Demo Collector', hashPassword('demo-1234'), 'user', 'TX', 0, t);
     d.prepare(`INSERT INTO ledger(user_id, kind, amount_cents, memo, created_at) VALUES (?,?,?,?,?)`)
       .run(demo.lastInsertRowid, 'test_credit', 250000, 'Test credit (no real money)', t);
-    void admin;
 
     const box = d.prepare(`INSERT INTO boxes(slug, name, numeral, tagline, price_cents, sort) VALUES (?,?,?,?,?,?)`);
     const band = d.prepare(`INSERT INTO bands(box_id, label, value_cents, odds_ppm, sort) VALUES (?,?,?,?,?)`);

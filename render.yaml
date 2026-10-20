@@ -20,7 +20,7 @@ services:
       - key: HB_DB_PATH
         value: /var/data/honestbox.db
       - key: HB_ADMIN_PASSWORD
-        sync: false          # Render asks for this when you create the service; it sets the admin password on first start
+        sync: false          # set in Render (12+ characters); there is no admin account until it is set
     disk:
       name: honestbox-data
       mountPath: /var/data
