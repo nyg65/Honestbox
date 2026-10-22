@@ -31,7 +31,7 @@ export default async function Ledger({ searchParams }: { searchParams: Promise<R
           <section key={box.id} className="card stack" style={{ gap: 12 }}>
             <div className="between">
               <h2 style={{ fontSize: '1.5rem' }}>{box.name} <span className="mono muted" style={{ fontSize: '1rem', fontFamily: 'var(--mono)' }}>{usd(box.price_cents)}</span></h2>
-              <span className="muted">{pulls.toLocaleString('en-US')} pulls · published edge {(edge * 100).toFixed(1)}%</span>
+              <span className="muted">{pulls.toLocaleString('en-US')} pull{pulls === 1 ? '' : 's'} · published edge {(edge * 100).toFixed(1)}%</span>
             </div>
             <div className="scroll"><table className="data" style={{ minWidth: 520 }}>
               <thead><tr><th>Band</th><th className="num">Value</th><th className="num">Published odds</th><th className="num">Actual pulls</th><th className="num">Actual share</th></tr></thead>
