@@ -53,13 +53,15 @@ export type BoxDetail = BoxSummary & {
 
 export type Pull = {
   id: number; status: 'vault' | 'sold_back' | 'ship_requested' | 'shipped'; revealed: boolean; createdAt: string; holdUntil: string;
-  box: { slug: string; name: string; priceCents: number }; band: { label: string; oddsPpm: number };
+  box: { slug: string; name: string; priceCents: number }; band: { label: string; oddsPpm: number } | null;
+  /** Every watch in the box, in wheel order, with its odds. Sent before the spin. */
+  wheel: { bandId: number; label: string; valueCents: number; oddsPpm: number }[]; landedIndex: number | null;
   watch: { brand: string; model: string; reference: string; year: number | null; sizeMm: number | null; condition: string; papers: string;
     marketCents: number; salesCount: number; salesLowCents: number | null; salesHighCents: number | null } | null;
   valueAtPullCents: number | null; lockedCents: number | null; lockedAt: string | null;
   buyback: { creditCents: number; cashCents: number; creditPct: number; cashPct: number; basis: 'locked' | 'market' } | null;
   shipFeeCents: number | null;
-  fair: { serverSeedHash: string; clientSeed: string; nonce: number; rollPpm: number; serverSeed: string | null };
+  fair: { serverSeedHash: string; clientSeed: string; nonce: number; rollPpm: number | null; serverSeed: string | null };
 };
 
 export type DropItem = {

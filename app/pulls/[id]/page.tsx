@@ -2,7 +2,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Shell, Flash } from '@/components/Shell.tsx';
 import { WatchArt, artFor } from '@/components/Mark.tsx';
-import { Reveal } from '@/components/Reveal.tsx';
+import { Roulette, WheelFace } from '@/components/Roulette.tsx';
+import { pocketsOf, landedIndex } from '@/lib/wheel.ts';
 import { requireUser } from '@/lib/auth.ts';
 import { getPull, buybackQuote, settings, shipFee, valueBasis, flag } from '@/lib/engine.ts';
 import { usd, oneIn } from '@/lib/money.ts';
@@ -22,14 +23,18 @@ export default async function PullPage({ params, searchParams }: { params: Promi
   const daysLeft = Math.max(0, Math.ceil((Date.parse(p.hold_until) - Date.now()) / 86400_000));
   const art = artFor(p.brand);
   const reveal = revealAction.bind(null, p.id);
+  const pockets = pocketsOf(p.odds_snapshot);
 
   return (
     <Shell tab="vault">
       <div className="narrow page stack" style={{ gap: 20 }}>
         <span className="eyebrow">{p.box_name} · {usd(p.price_cents)} · pull #{p.id}</span>
         <Flash sp={sp} />
-        <Reveal revealed={!!p.revealed} onReveal={reveal}>
-          <div className="stack" style={{ gap: 18 }}>
+        {!p.revealed ? <Roulette pockets={pockets} onSpin={reveal} /> : (
+          <div className="stack rise" style={{ gap: 18 }}>
+            <div style={{ display: 'grid', placeItems: 'center' }}>
+              <WheelFace pockets={pockets} rotation={-(p.roll_ppm / 1_000_000) * 360} spinning={false} size={230} highlight={landedIndex(pockets, p.roll_ppm)} />
+            </div>
             <div className="cert stack" style={{ alignItems: 'center', gap: 14, textAlign: 'center', padding: '24px 20px' }}>
               <span className="pill pill-brass">{p.band_odds >= 500_000 ? 'Most common pull' : `${oneIn(p.band_odds)} pull`}</span>
               <WatchArt size={150} dial={art.dial} bezel={art.bezel} />
@@ -89,14 +94,14 @@ export default async function PullPage({ params, searchParams }: { params: Promi
               <div className="stack" style={{ gap: 6, marginTop: 10, wordBreak: 'break-all' }}>
                 <span>Server seed hash: <span className="mono">{p.server_hash}</span></span>
                 <span>Client seed: <span className="mono">{p.client_seed}</span> · Nonce: <span className="mono">{p.nonce}</span></span>
-                <span>Roll: <span className="mono">{p.roll_ppm.toLocaleString('en-US')}</span> of 1,000,000 · Band: {p.band_label}</span>
+                <span>Roll: <span className="mono">{p.roll_ppm.toLocaleString('en-US')}</span> of 1,000,000, so the pointer stopped {((p.roll_ppm / 1_000_000) * 360).toFixed(2)}° clockwise from the start of the first slice · Watch: {p.band_label}</span>
                 {p.revealed_at
                   ? <span>Server seed (revealed): <span className="mono">{p.server_seed}</span></span>
                   : <span className="muted">The server seed is revealed when you rotate your seed on the <Link href="/fair">provably fair</Link> page.</span>}
               </div>
             </details>
           </div>
-        </Reveal>
+        )}
       </div>
     </Shell>
   );

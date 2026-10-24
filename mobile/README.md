@@ -6,8 +6,8 @@ A native app built with Expo (SDK 57, React Native) and Expo Router. It talks to
 ## Screens
 
 - Welcome, sign in, sign up (age, state and referral code)
-- **Boxes:** the five boxes with odds and house edge; box page with the full odds table and a confirm step before opening
-- **The reveal:** tap the stovepipe hat; it tips away with haptics and the watch rises into view (respects Reduce Motion)
+- **Boxes:** the five boxes with odds and house edge; box page with the wheel, the full odds table (highest value first) and a confirm step before opening
+- **The reveal:** a roulette wheel with every watch in the box as a slice drawn to its real odds; tap Spin and the pointer stops exactly at your provably fair roll (haptics; respects Reduce Motion)
 - **Your pull:** today's value and change since pulled, sell back (credit or cash), lock in today's value, keep floating, ship (with the $15 fee under $250), verify the pull
 - **Drops:** this week's pieces, 10-minute hold, buy with shipping address
 - **Vault:** every pull with its status, value movement and lock badge

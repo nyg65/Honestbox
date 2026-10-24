@@ -14,7 +14,16 @@ const { hashPassword } = await import('../lib/password.ts');
 
 const demo = () => (db().prepare(`SELECT id FROM users WHERE email = 'demo@honestbox.test'`).get() as { id: number }).id;
 const adminId = () => (db().prepare(`SELECT id FROM users WHERE role = 'admin'`).get() as { id: number }).id;
+// Rare pockets hold a single watch; a lucky roll in one test must not seal a box for the next.
+function restock() {
+  const empty = db().prepare(`SELECT b.id FROM bands b WHERE b.odds_ppm > 0 AND NOT EXISTS (SELECT 1 FROM watches w WHERE w.band_id = b.id AND w.status = 'in_box')`).all() as { id: number }[];
+  for (const { id } of empty) {
+    db().prepare(`INSERT INTO watches(brand, model, reference, year, size_mm, condition, papers, market_cents, cost_cents, sales_count, sales_low_cents, sales_high_cents, status, band_id, created_at)
+      SELECT brand, model, reference, year, size_mm, condition, papers, market_cents, cost_cents, sales_count, sales_low_cents, sales_high_cents, 'in_box', band_id, created_at FROM watches WHERE band_id = ? LIMIT 1`).run(id);
+  }
+}
 function newUser(email: string, state = 'TX') {
+  restock();
   const r = db().prepare(`INSERT INTO users(email, name, pass_hash, state, created_at) VALUES (?,?,?,?,?)`).run(email, 'T', hashPassword('x-123456'), state, new Date().toISOString());
   return Number(r.lastInsertRowid);
 }
@@ -25,6 +34,17 @@ test('seeded boxes publish a 20% edge and odds that sum to 100%', () => {
     assert.equal(bands.reduce((a, b) => a + b.odds_ppm, 0), fair.PPM, box.name);
     assert.ok(Math.abs(fair.houseEdge(bands, box.price_cents) - 0.2) < 0.03, `${box.name} edge ${fair.houseEdge(bands, box.price_cents)}`);
     assert.ok(E.boxState(box, bands, E.settings()).openable, `${box.name} should be openable`);
+  }
+});
+
+test('every box has at least 15 watches on its wheel, each in stock, at about a 20% edge', () => {
+  for (const box of E.listBoxes()) {
+    const bands = E.bandsFor(box.id);
+    assert.ok(bands.length >= 15, `${box.name} has ${bands.length} pockets`);
+    assert.equal(new Set(bands.map((b) => b.label)).size, bands.length, `${box.name} pockets are distinct watches`);
+    assert.ok(bands.every((b) => (b.stock ?? 0) >= 1), `${box.name} every pocket stocked`);
+    const edge = fair.houseEdge(bands, box.price_cents);
+    assert.ok(edge > 0.19 && edge < 0.21, `${box.name} edge ${edge}`);
   }
 });
 
@@ -185,12 +205,13 @@ test('shipping a pull under $250 costs $15 from credit; $250 and up ships free',
   const addr = { name: 'S', line1: '1 Main St', city: 'Austin', state: 'TX', zip: '78701' };
   const box = E.getBox('railsplitter')!; const bands = E.bandsFor(box.id);
   const force = (i: number) => A.saveBox(adminId(), box.id, box.price_cents, true, bands.map((b, j) => ({ ...b, odds_ppm: j === i ? fair.PPM : 0 })));
-  force(bands.length - 1); // Casio, Timex band ($66)
+  const cheapest = bands.reduce((m, b, i) => (b.value_cents < bands[m].value_cents ? i : m), 0);
+  force(cheapest); // a watch worth under $250
   const cheap = E.openBox(u, 'railsplitter');
   let before = E.balance(u);
   E.requestShip(u, cheap, addr);
   assert.equal(E.balance(u), before - 1500);
-  force(1); // Hamilton, Tissot band ($700)
+  force(0); // the top pocket, worth far more than $250
   const dear = E.openBox(u, 'railsplitter');
   before = E.balance(u);
   E.requestShip(u, dear, addr);
@@ -198,7 +219,7 @@ test('shipping a pull under $250 costs $15 from credit; $250 and up ships free',
   A.saveBox(adminId(), box.id, box.price_cents, true, bands);
   // not enough credit for the fee: refused, nothing changes
   const poor = newUser('ship-poor@test.dev'); E.addTestCredit(poor, 10000);
-  force(bands.length - 1);
+  force(cheapest);
   const p2 = E.openBox(poor, 'railsplitter');
   assert.throws(() => E.requestShip(poor, p2, addr), /Shipping this watch costs \$15/);
   assert.equal(E.getPull(poor, p2)!.status, 'vault');

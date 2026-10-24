@@ -290,72 +290,56 @@ function seedIfEmpty(d: DatabaseSync) {
     const watch = d.prepare(`INSERT INTO watches(brand, model, reference, year, size_mm, condition, papers, market_cents, cost_cents, sales_count, sales_low_cents, sales_high_cents, status, band_id, created_at)
       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
 
-    // Sample catalog. Values are placeholders until live market data is connected.
-    const W = {
-      sub: ['Rolex', 'Submariner Date', '126610LN', 2022, 41, 1500000],
-      speedy: ['Omega', 'Speedmaster Professional', '310.30.42.50.01.001', 2021, 42, 800000],
-      bb58: ['Tudor', 'Black Bay 58', '79030N', 2021, 39, 350000],
-      prx: ['Tissot', 'PRX Powermatic 80', 'T137.407.11.041.00', 2023, 40, 70000],
-      khaki: ['Hamilton', 'Khaki Field Auto', 'H70455133', 2022, 38, 68000],
-      jazz: ['Hamilton', 'Jazzmaster Viewmatic', 'H32515135', 2022, 40, 72000],
-      gent: ['Tissot', 'Gentleman Powermatic 80', 'T127.407.11.041.00', 2022, 40, 55500],
-      seiko5: ['Seiko', '5 Sports', 'SRPD55', 2023, 42, 22000],
-      promaster: ['Citizen', 'Promaster Dive', 'BN0151-09L', 2022, 44, 22500],
-      bambino: ['Orient', 'Bambino V2', 'FAC00009N0', 2023, 41, 11600],
-      snk: ['Seiko', 'SNK809', 'SNK809', 2021, 37, 11600],
-      gshock: ['Casio', 'G-Shock DW5600', 'DW5600E-1V', 2024, 43, 6600],
-      timex: ['Timex', 'Weekender Chronograph', 'TW2R42600', 2023, 40, 6600],
-      kamasu: ['Orient', 'Kamasu', 'RA-AA0003R', 2023, 42, 15800],
-      presage: ['Seiko', 'Presage Cocktail Time', 'SRPB43', 2022, 41, 29500],
-    } as const;
-    const add = (key: keyof typeof W, bandId: number | bigint, n: number) => {
-      const [brand, model, ref, year, size, mkt] = W[key];
-      for (let i = 0; i < n; i++) {
-        watch.run(brand, model, ref, year, size, 'Very good', 'Box and papers', mkt, Math.round(mkt * 0.92), 12,
-          Math.round(mkt * 0.95), Math.round(mkt * 1.06), 'in_box', bandId, t);
-      }
+    // Watch catalog: sample pre-owned values in cents, placeholders until live market data is connected.
+    const W: Record<string, [string, string, string, number, number, number]> = {
+      duro: ["Casio", "Duro MDV106", "MDV106-1A", 2024, 44, 5500],
+      scout: ["Timex", "Expedition Scout", "TW4B11900", 2024, 40, 5000],
+      gshock: ["Casio", "G-Shock DW5600", "DW5600E-1V", 2024, 43, 6000],
+      weekender: ["Timex", "Weekender Chronograph", "TW2R42600", 2023, 40, 7000],
+      snk: ["Seiko", "5 SNK809", "SNK809", 2021, 37, 11000],
+      bambino: ["Orient", "Bambino V2", "FAC00009N0", 2023, 41, 11600],
+      kamasu: ["Orient", "Kamasu", "RA-AA0003R", 2023, 42, 15800],
+      seiko5: ["Seiko", "5 Sports", "SRPD55", 2023, 42, 22000],
+      promaster: ["Citizen", "Promaster Dive", "BN0151-09L", 2022, 44, 22500],
+      presage: ["Seiko", "Presage Cocktail Time", "SRPB43", 2022, 41, 29500],
+      tsuyosa: ["Citizen", "Tsuyosa", "NJ0150-56W", 2023, 40, 32000],
+      gent: ["Tissot", "Gentleman Powermatic 80", "T127.407.11.041.00", 2022, 40, 55500],
+      khaki: ["Hamilton", "Khaki Field Auto", "H70455133", 2022, 38, 68000],
+      prx: ["Tissot", "PRX Powermatic 80", "T137.407.11.041.00", 2023, 40, 70000],
+      jazz: ["Hamilton", "Jazzmaster Viewmatic", "H32515135", 2022, 40, 72000],
+      conquest: ["Longines", "Conquest Classic", "L2.386.4.72.6", 2021, 40, 120000],
+      aquis: ["Oris", "Aquis Date", "01 733 7766 4135", 2022, 41, 170000],
+      carrera: ["TAG Heuer", "Carrera Calibre 5", "WBN2111.BA0639", 2022, 39, 190000],
+      bb58: ["Tudor", "Black Bay 58", "79030N", 2021, 39, 350000],
+      seamaster: ["Omega", "Seamaster Diver 300M", "210.30.42.20.03.001", 2021, 42, 420000],
+      santos: ["Cartier", "Santos, medium", "WSSA0029", 2020, 35, 600000],
+      speedy: ["Omega", "Speedmaster Professional", "310.30.42.50.01.001", 2021, 42, 600000],
+      op41: ["Rolex", "Oyster Perpetual 41", "124300", 2022, 41, 850000],
+      datejust: ["Rolex", "Datejust 41", "126300", 2022, 41, 1060000],
+      sub: ["Rolex", "Submariner Date", "126610LN", 2022, 41, 1380000],
     };
-
-    // Five boxes, each with a published house edge of about 20%. Named for Lincoln's path: rail-splitter,
-    // postmaster of New Salem, lawyer, statesman, president. Bands are rolled top to bottom.
-
-    // I. The Railsplitter, $100
-    const b1 = box.run('railsplitter', 'The Railsplitter', 'I', 'Casio and Timex, with a shot at a Tudor', 10000, 1).lastInsertRowid;
-    add('bb58', band.run(b1, 'Tudor Black Bay 58', 350000, 500, 1).lastInsertRowid, 1);
-    const i2 = band.run(b1, 'Hamilton, Tissot', 70000, 10000, 2).lastInsertRowid; add('prx', i2, 2); add('khaki', i2, 2);
-    const i3 = band.run(b1, 'Seiko, Citizen', 22100, 40000, 3).lastInsertRowid; add('seiko5', i3, 4); add('promaster', i3, 4);
-    const i4 = band.run(b1, 'Casio, Timex', 6600, 949500, 4).lastInsertRowid; add('gshock', i4, 15); add('timex', i4, 15);
-
-    // II. The Postmaster, $250
-    const b2 = box.run('postmaster', 'The Postmaster', 'II', 'Seiko, Hamilton, Tissot and up', 25000, 2).lastInsertRowid;
-    add('speedy', band.run(b2, 'Omega Speedmaster Professional', 800000, 2000, 1).lastInsertRowid, 1);
-    add('bb58', band.run(b2, 'Tudor Black Bay 58', 350000, 10000, 2).lastInsertRowid, 2);
-    const ii3 = band.run(b2, 'Hamilton, Tissot', 70000, 60000, 3).lastInsertRowid; add('prx', ii3, 3); add('khaki', ii3, 3);
-    const ii4 = band.run(b2, 'Seiko, Orient', 11600, 928000, 4).lastInsertRowid; add('snk', ii4, 10); add('bambino', ii4, 10);
-
-    // III. The Counselor, $500
-    const b3 = box.run('counselor', 'The Counselor', 'III', 'Top pull: Rolex Submariner Date', 50000, 3).lastInsertRowid;
-    add('sub', band.run(b3, 'Rolex Submariner Date', 1500000, 2000, 1).lastInsertRowid, 1);
-    add('speedy', band.run(b3, 'Omega Speedmaster Professional', 800000, 6000, 2).lastInsertRowid, 1);
-    add('bb58', band.run(b3, 'Tudor Black Bay 58', 350000, 30000, 3).lastInsertRowid, 2);
-    const iii4 = band.run(b3, 'Hamilton, Tissot', 70000, 120000, 4).lastInsertRowid; add('prx', iii4, 3); add('jazz', iii4, 3);
-    add('kamasu', band.run(b3, 'Orient, Seiko', 15800, 842000, 5).lastInsertRowid, 15);
-
-    // IV. The Statesman, $1,000
-    const b4 = box.run('statesman', 'The Statesman', 'IV', 'Top pull: Rolex Submariner Date', 100000, 4).lastInsertRowid;
-    add('sub', band.run(b4, 'Rolex Submariner Date', 1500000, 6000, 1).lastInsertRowid, 1);
-    add('speedy', band.run(b4, 'Omega Speedmaster Professional', 800000, 16000, 2).lastInsertRowid, 2);
-    add('bb58', band.run(b4, 'Tudor Black Bay 58', 350000, 60000, 3).lastInsertRowid, 3);
-    const iv4 = band.run(b4, 'Hamilton, Tissot', 70000, 250000, 4).lastInsertRowid; add('prx', iv4, 4); add('jazz', iv4, 4);
-    add('presage', band.run(b4, 'Seiko Presage', 29500, 668000, 5).lastInsertRowid, 12);
-
-    // V. The President, $2,000
-    const b5 = box.run('president', 'The President', 'V', '1 in 5 pulls is worth $3,500 or more', 200000, 5).lastInsertRowid;
-    add('sub', band.run(b5, 'Rolex Submariner Date', 1500000, 15000, 1).lastInsertRowid, 2);
-    add('speedy', band.run(b5, 'Omega Speedmaster Professional', 800000, 50000, 2).lastInsertRowid, 3);
-    add('bb58', band.run(b5, 'Tudor Black Bay 58', 350000, 140000, 3).lastInsertRowid, 5);
-    const v4 = band.run(b5, 'Hamilton, Tissot', 70000, 300000, 4).lastInsertRowid; add('prx', v4, 5); add('khaki', v4, 5);
-    add('gent', band.run(b5, 'Tissot Gentleman', 55500, 495000, 5).lastInsertRowid, 12);
+    // Every pocket on a box's wheel is one watch model. Odds are in parts per million and add up to 1,000,000.
+    // Pockets are listed in wheel order: rare and common watches alternate around the wheel, and the provably fair
+    // roll is read around the wheel in this order. Each box publishes a house edge of about 20%.
+    const BOXES: [string, string, string, string, number, [string, number][]][] = [
+      ['railsplitter', 'The Railsplitter', 'I', "Casio and Timex, with a shot at a Tudor", 10000, [['bb58', 200], ['scout', 258605], ['aquis', 404], ['duro', 217241], ['prx', 2054], ['gshock', 185223], ['khaki', 2166], ['weekender', 139642], ['gent', 3143], ['snk', 60998], ['presage', 10005], ['bambino', 55341], ['promaster', 16436], ['kamasu', 31415], ['seiko5', 17127]]],
+      ['postmaster', 'The Postmaster', 'II', "Seiko, Hamilton, Tissot, up to an Omega", 25000, [['speedy', 1607], ['gshock', 224803], ['bb58', 2865], ['weekender', 190535], ['aquis', 6218], ['snk', 117319], ['conquest', 9035], ['bambino', 110821], ['jazz', 15629], ['kamasu', 79550], ['prx', 16109], ['seiko5', 55769], ['khaki', 16618], ['promaster', 54440], ['gent', 20664], ['presage', 40710], ['tsuyosa', 37308]]],
+      ['counselor', 'The Counselor', 'III', "Top pull: Rolex Submariner Date", 50000, [['sub', 1398], ['bambino', 232330], ['speedy', 3409], ['kamasu', 166927], ['seamaster', 4993], ['seiko5', 117142], ['bb58', 6068], ['promaster', 114359], ['carrera', 11666], ['presage', 85587], ['aquis', 13141], ['tsuyosa', 78453], ['conquest', 19075], ['gent', 43526], ['jazz', 32947], ['khaki', 35024], ['prx', 33955]]],
+      ['statesman', 'The Statesman', 'IV', "Top pull: Rolex Submariner Date", 100000, [['sub', 4423], ['seiko5', 170460], ['op41', 6782], ['promaster', 167112], ['santos', 9222], ['presage', 131587], ['speedy', 9222], ['tsuyosa', 122473], ['seamaster', 12633], ['gent', 75342], ['bb58', 14838], ['khaki', 62980], ['carrera', 25437], ['prx', 61390], ['aquis', 28060], ['jazz', 59883], ['conquest', 38156]]],
+      ['president', 'The President', 'V', "1 in 5 pulls is worth $3,500 or more", 200000, [['sub', 11690], ['presage', 210256], ['datejust', 14253], ['gent', 130768], ['op41', 16825], ['khaki', 112256], ['santos', 21858], ['prx', 109838], ['speedy', 21858], ['jazz', 107537], ['seamaster', 28577], ['conquest', 73257], ['bb58', 32773], ['aquis', 56388], ['carrera', 51866]]],
+    ];
+    const units = (ppm: number) => (ppm < 20000 ? 1 : ppm < 100000 ? 2 : ppm < 200000 ? 4 : 6);
+    BOXES.forEach(([slug, name, numeral, tagline, price, pockets], bi) => {
+      const boxId = box.run(slug, name, numeral, tagline, price, bi + 1).lastInsertRowid;
+      pockets.forEach(([key, ppm], pi) => {
+        const [brand, model, ref, year, size, mkt] = W[key];
+        const bandId = band.run(boxId, `${brand} ${model}`, mkt, ppm, pi + 1).lastInsertRowid;
+        for (let n = 0; n < units(ppm); n++) {
+          watch.run(brand, model, ref, year, size, 'Very good', 'Box and papers', mkt, Math.round(mkt * 0.92), 12,
+            Math.round(mkt * 0.95), Math.round(mkt * 1.06), 'in_box', bandId, t);
+        }
+      });
+    });
 
     // Drop No. VII
     const start = new Date(); const end = new Date(Date.now() + 1000 * 60 * 60 * 62);

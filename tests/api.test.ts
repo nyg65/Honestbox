@@ -56,9 +56,19 @@ test('the full box flow: list, odds, open, hidden until revealed, reveal, lock, 
   assert.equal(sealed.revealed, false);
   assert.equal(sealed.watch, null, 'the watch stays hidden before the reveal');
   assert.equal(sealed.fair.serverSeed, null, 'the secret seed is never sent before rotation');
+  assert.equal(sealed.fair.rollPpm, null, 'the roll is not sent before the spin');
+  assert.equal(sealed.landedIndex, null);
+  assert.equal(sealed.band, null, 'the landed slice is not sent before the spin');
+  assert.ok(sealed.wheel.length >= 15, 'the wheel shows every watch in the box');
+  assert.equal(sealed.wheel.reduce((a: number, w: J) => a + w.oddsPpm, 0), 1_000_000);
 
   const shown = call('POST', `pulls/${opened.body.pullId}/reveal`, {}, t).body;
   assert.ok(shown.watch.brand); assert.equal(shown.buyback.basis, 'market');
+  // the wheel stops exactly at the roll: the landed pocket is the one whose cumulative range contains it
+  let edge = 0; let idx = -1;
+  for (let i = 0; i < shown.wheel.length; i++) { edge += shown.wheel[i].oddsPpm; if (shown.fair.rollPpm < edge) { idx = i; break; } }
+  assert.equal(shown.landedIndex, idx);
+  assert.equal(`${shown.watch.brand} ${shown.watch.model}`, shown.wheel[idx].label);
   const locked = call('POST', `pulls/${opened.body.pullId}/lock`, {}, t).body;
   assert.equal(locked.lockedCents, shown.watch.marketCents); assert.equal(locked.pull.buyback.basis, 'locked');
   const sold = call('POST', `pulls/${opened.body.pullId}/sell`, { method: 'credit' }, t);

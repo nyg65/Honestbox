@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
+import { WheelFace } from '../../components/WheelReveal';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { Body, Button, Card, Eyebrow, H1, Italic, Loading, Mono, Muted, Notice, Row, Rule, Screen } from '../../components/ui';
@@ -16,9 +17,11 @@ export default function BoxScreen() {
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const { width } = useWindowDimensions();
 
   if (!box) return <Screen><Notice text={error} />{!error && <Loading />}</Screen>;
   const maxOdds = Math.max(...box.bands.map((b) => b.oddsPpm));
+  const pockets = box.bands.filter((b) => b.oddsPpm > 0).map((b, i) => ({ bandId: i, label: b.label, valueCents: b.valueCents, oddsPpm: b.oddsPpm }));
   const short = (account?.balanceCents ?? 0) < box.priceCents;
 
   async function open() {
@@ -45,9 +48,14 @@ export default function BoxScreen() {
       </Row>
       <Muted style={{ fontSize: 13 }}>Sell back any pull for {box.buyback.creditPct}% of market value in credit, or {box.buyback.cashPct}% in cash.</Muted>
 
-      <Eyebrow>What&apos;s inside</Eyebrow>
+      <Eyebrow>The wheel: {pockets.length} watches</Eyebrow>
+      <View style={{ alignItems: 'center', gap: 8 }}>
+        <WheelFace pockets={pockets} rotation={0} size={Math.min(width - 48, 340)} />
+        <Muted style={{ fontSize: 13, textAlign: 'center' }}>Every watch in the box is a slice, drawn to its real odds. The rarest pieces are the thin slivers marked with brass dots. Where the pointer stops is your roll.</Muted>
+      </View>
+      <Eyebrow>What&apos;s inside, highest value first</Eyebrow>
       <View>
-        {box.bands.map((b, i) => (
+        {[...box.bands].sort((a, b) => b.valueCents - a.valueCents).map((b, i) => (
           <View key={b.label} style={{ paddingVertical: 11, gap: 6 }}>
             {i > 0 && <View style={{ position: 'absolute', top: 0, left: 0, right: 0 }}><Rule /></View>}
             <Row><Body style={{ fontWeight: '600', flex: 1 }}>{b.label}</Body><Mono>{usd(b.valueCents)}</Mono></Row>

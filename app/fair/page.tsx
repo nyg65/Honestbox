@@ -23,7 +23,7 @@ export default async function Fair({ searchParams }: { searchParams: Promise<Rec
           <li>Before you open anything, we show you the <strong>SHA-256 hash</strong> of a secret server seed. That locks in our side of every roll.</li>
           <li>You choose the <strong>client seed</strong>, so we can&apos;t pick a seed pair that favors us.</li>
           <li>Each pull computes HMAC-SHA256(server seed, &quot;client seed:nonce&quot;). The first 13 hex digits, scaled to 0–999,999, are the roll. The nonce counts up by one per pull.</li>
-          <li>The roll lands in one band of the published odds, read top to bottom. A second roll with &quot;:unit&quot; added picks which physical watch in that band.</li>
+          <li>The roll is a number from 0 to 999,999. On the wheel, each watch&apos;s slice is its share of 1,000,000, laid out clockwise from the top in the box&apos;s wheel order. The pointer stops at roll ÷ 1,000,000 of a full turn, so the slice it lands on is exactly the watch the roll picks. No near-misses are staged. A second roll with &quot;:unit&quot; added picks which physical watch of that model.</li>
           <li>When you rotate your seed, we reveal the old server seed. Check that it hashes to what we showed you, then re-compute every pull yourself.</li>
         </ol>
 

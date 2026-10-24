@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { WatchArt } from '../../components/art';
-import { HatReveal } from '../../components/HatReveal';
+import { WheelReveal } from '../../components/WheelReveal';
 import { Body, Button, Card, Cert, Eyebrow, H1, Loading, Mono, Muted, Notice, Pill, Screen } from '../../components/ui';
 import { api, ApiError, type Pull } from '../../lib/api';
 import { daysLeft, oneIn, usd } from '../../lib/format';
@@ -15,10 +15,13 @@ export default function PullScreen() {
   const [msg, setMsg] = useState<{ text: string; kind: 'ok' | 'error' } | null>(ok ? { text: ok, kind: 'ok' } : null);
   const [busy, setBusy] = useState(false);
   const [showFair, setShowFair] = useState(false);
+  const spun = useRef<Pull | null>(null);
 
   if (!p) return <Screen><Notice text={error} />{!error && <Loading />}</Screen>;
 
-  async function reveal() { setData(await api<Pull>(`pulls/${id}/reveal`, { method: 'POST', body: {} })); }
+  // The server marks the pull revealed and returns the roll; the wheel spins to it, then the watch is shown.
+  async function spin() { const r = await api<Pull>(`pulls/${id}/reveal`, { method: 'POST', body: {} }); spun.current = r; return r.fair.rollPpm!; }
+  function landed() { if (spun.current) setData(spun.current); }
 
   async function lock() {
     setBusy(true);
@@ -36,11 +39,11 @@ export default function PullScreen() {
     <Screen refreshing={refreshing} onRefresh={() => reload(true)}>
       <Eyebrow>{p.box.name} · {usd(p.box.priceCents)} · pull #{p.id}</Eyebrow>
       <Notice text={msg?.text} kind={msg?.kind} />
-      <HatReveal revealed={p.revealed} onReveal={reveal}>
+      <WheelReveal pockets={p.wheel} revealed={p.revealed} rollPpm={p.fair.rollPpm} onSpin={spin} onLanded={landed}>
         {w && (
           <View style={{ gap: 16 }}>
             <Cert style={{ alignItems: 'center', paddingVertical: 22 }}>
-              <Pill text={p.band.oddsPpm >= 500_000 ? 'Most common pull' : `${oneIn(p.band.oddsPpm)} pull`} gold />
+              <Pill text={(p.band?.oddsPpm ?? 0) >= 500_000 ? 'Most common pull' : `${oneIn(p.band?.oddsPpm ?? 0)} pull`} gold />
               <WatchArt brand={w.brand} size={150} />
               <H1 style={{ textAlign: 'center', fontSize: 26 }}>{w.brand} {w.model}</H1>
               <Muted style={{ textAlign: 'center', fontSize: 13 }}>{[w.reference && `Ref. ${w.reference}`, w.sizeMm && `${w.sizeMm} mm`, w.year, w.condition, w.papers].filter(Boolean).join(' · ')}</Muted>
@@ -89,7 +92,7 @@ export default function PullScreen() {
                   <>
                     <Mono style={{ fontSize: 11.5, color: C.muted }}>Server seed hash: {p.fair.serverSeedHash}</Mono>
                     <Mono style={{ fontSize: 11.5, color: C.muted }}>Client seed: {p.fair.clientSeed} · Nonce: {p.fair.nonce}</Mono>
-                    <Mono style={{ fontSize: 11.5, color: C.muted }}>Roll: {p.fair.rollPpm.toLocaleString('en-US')} of 1,000,000 · Band: {p.band.label}</Mono>
+                    <Mono style={{ fontSize: 11.5, color: C.muted }}>Roll: {p.fair.rollPpm?.toLocaleString('en-US')} of 1,000,000, so the pointer stopped {(((p.fair.rollPpm ?? 0) / 1_000_000) * 360).toFixed(2)}° clockwise from the start of the first slice · Watch: {p.band?.label}</Mono>
                     <Muted style={{ fontSize: 12 }}>{p.fair.serverSeed ? `Server seed (revealed): ${p.fair.serverSeed}` : 'The server seed is revealed when you rotate your seed in Provably fair.'}</Muted>
                   </>
                 )}
@@ -97,7 +100,7 @@ export default function PullScreen() {
             </Pressable>
           </View>
         )}
-      </HatReveal>
+      </WheelReveal>
     </Screen>
   );
 }

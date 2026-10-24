@@ -52,9 +52,13 @@ export async function openBoxAction(f: FormData) {
   redirect(`/pulls/${id}`);
 }
 
-export async function revealAction(pullId: number) {
+/** Marks the pull revealed and returns its roll, so the wheel can stop exactly where the roll says. */
+export async function revealAction(pullId: number): Promise<number> {
   const u = await requireUser();
+  const p = E.getPull(u.id, pullId);
+  if (!p) throw new Error('Not your pull');
   E.markRevealed(u.id, pullId);
+  return p.roll_ppm;
 }
 
 export async function sellBackAction(f: FormData) {

@@ -1,6 +1,7 @@
 // HonestBox mobile API, version 1. Plain functions in, JSON out, so it can be tested without a web server.
 // Auth: POST /auth/signin or /auth/signup returns a bearer token; send it as "Authorization: Bearer <token>".
 import { db } from './db.ts';
+import { pocketsOf } from './wheel.ts';
 import * as E from './engine.ts';
 import { settleCommissions, affiliateSummary } from './affiliate.ts';
 import { expectedValueCents, houseEdge } from './fair.ts';
@@ -37,13 +38,15 @@ function boxSummary(b: E.Box, s: Record<string, string>) {
   };
 }
 
+const wheelOf = pocketsOf;
+
 function pullShape(p: NonNullable<ReturnType<typeof E.getPull>>, s: Record<string, string>) {
   const q = E.buybackQuote(E.valueBasis(p), s);
   return {
     id: p.id, status: p.status, revealed: !!p.revealed, createdAt: p.created_at, holdUntil: p.hold_until,
     box: { slug: p.box_slug, name: p.box_name, priceCents: p.price_cents },
-    band: { label: p.band_label, oddsPpm: p.band_odds },
-    // Before the reveal the app only learns that a pull exists; the watch stays hidden until the hat is lifted.
+    band: p.revealed ? { label: p.band_label, oddsPpm: p.band_odds } : null,
+    // Before the spin the app only learns that a pull exists and what is on the wheel; the result stays hidden.
     watch: p.revealed ? {
       brand: p.brand, model: p.model, reference: p.reference, year: p.year, sizeMm: p.size_mm, condition: p.condition, papers: p.papers,
       marketCents: p.market_cents, salesCount: p.sales_count, salesLowCents: p.sales_low_cents, salesHighCents: p.sales_high_cents,
@@ -52,8 +55,12 @@ function pullShape(p: NonNullable<ReturnType<typeof E.getPull>>, s: Record<strin
     lockedCents: p.locked_cents, lockedAt: p.locked_at,
     buyback: p.revealed ? { creditCents: q.credit, cashCents: q.cash, creditPct: q.creditBp / 100, cashPct: q.cashBp / 100, basis: p.locked_cents != null ? 'locked' : 'market' } : null,
     shipFeeCents: p.revealed ? E.shipFee(p.market_cents, s) : null,
+    // The wheel is the box's odds table at the moment of the pull, in wheel order. It is safe to send before the spin;
+    // the roll that decides where the wheel stops is only sent once the customer spins.
+    wheel: wheelOf(p.odds_snapshot),
+    landedIndex: p.revealed ? wheelOf(p.odds_snapshot).findIndex((w) => w.bandId === p.band_id) : null,
     fair: {
-      serverSeedHash: p.server_hash, clientSeed: p.client_seed, nonce: p.nonce, rollPpm: p.roll_ppm,
+      serverSeedHash: p.server_hash, clientSeed: p.client_seed, nonce: p.nonce, rollPpm: p.revealed ? p.roll_ppm : null,
       serverSeed: p.revealed_at ? p.server_seed : null, // the secret seed is only shown after the customer rotates it
     },
   };
