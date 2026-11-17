@@ -36,7 +36,7 @@ Last updated: November 17, 2026 (afternoon)
 | # | Task | Owner | Status | Notes |
 |---|---|---|---|---|
 | 0.1 | Turn on MFA for the AWS root user; store root credentials offline | John | Not started | Root should never be used day to day |
-| 0.2 | Budget alert at the D6 amount, emailed to John and Max | Claude | Not started | AWS Budgets |
+| 0.2 | Budget alert at the D6 amount, emailed to John and Max | Claude | **Done** | Budget `honestbox-monthly`, $100/month: emails John at 50% and 100% actual, and when the forecast passes 100%. Add Max's address when he wants it. |
 | 0.3 | Replace `claude`'s AdministratorAccess with a policy limited to the services this migration uses | Claude, approved by John | Not started | Route 53, ACM, S3, EC2/ECR, CloudFront, Secrets Manager, CloudWatch, IAM for the app's own role |
 | 0.4 | Turn on CloudTrail (one trail, all regions) so every change is logged | Claude | Not started | |
 | 0.5 | Tag everything `project=honestbox`, `env=prod` or `env=staging` for cost tracking | Claude | Not started | |
@@ -51,7 +51,7 @@ Goal: Route 53 answers for honest-box.com with exactly the records GoDaddy has t
 | 1.2 | Note whether DNSSEC is on at GoDaddy | John | Not started | If on, turn it off at GoDaddy before 1.7, or the domain stops resolving |
 | 1.3 | Create the honest-box.com hosted zone in Route 53 | Claude | **Done** | Zone Z0717949LR359TMD2QLY. Nameservers: ns-493.awsdns-61.com, ns-1825.awsdns-36.co.uk, ns-974.awsdns-57.net, ns-1419.awsdns-49.org. About $0.50 a month plus queries |
 | 1.4 | Recreate every GoDaddy record in Route 53; drop GoDaddy's parking records | Claude | **Done** | Nothing needed copying: parking, www-to-parking and _domainconnect were GoDaddy-only. One record on GoDaddy's page 2 was not seen. |
-| 1.5 | Add site records: `honest-box.com`, `www`, `api`, `staging` pointing to Render for now | Claude | Not started | Render custom domains: add them in Render first, then use the targets Render shows |
+| 1.5 | Add site records: `honest-box.com`, `www`, `api`, `staging` pointing to Render for now | Claude, then John in Render | **In progress** | Route 53 done Nov 17: `honest-box.com` A 216.24.57.1 (Render's load balancer; Route 53 can't alias to non-AWS hosts), `www` and `api` CNAME `honestbox.onrender.com`, TTL 300. Waiting on John to add the three domains in Render > Settings > Custom Domains so Render issues HTTPS. `staging` will be created on AWS (Phase 3), not Render. |
 | 1.6 | Lower TTLs at GoDaddy to 300 seconds a day before the switch | John | **Skipped** | Not needed: the domain was parked |
 | 1.7 | Change honest-box.com's nameservers at GoDaddy to the four Route 53 nameservers | John | **Done** | Nov 17. Delete the four awsdns NS records that were also added inside GoDaddy's record list (harmless, but misleading) |
 | 1.8 | Verify: nameservers, every record, email delivery, HTTPS on the site | Claude | **In progress** | Delegation confirmed Nov 17: AWS validated the certificate through Route 53 within 20 seconds. Site records and HTTPS still to do (1.5). No email yet (D5). |
@@ -107,6 +107,7 @@ Rollback: point the nameservers back to GoDaddy's at GoDaddy. Leave the GoDaddy 
 
 | Date | What happened |
 |---|---|
+| Nov 17, 2026 | $100 monthly budget alert created (emails John). Route 53 records added pointing honest-box.com, www and api at Render; verified with Route 53's answer test. GoDaddy record list cleaned up. |
 | Nov 17, 2026 | Nameservers switched at GoDaddy. Certificate for honest-box.com and *.honest-box.com requested and issued in us-east-1 (validation CNAME added to Route 53), which confirms Route 53 is live. |
 | Nov 17, 2026 | Decisions: us-east-1, single server (A), addresses as listed with staging, GoDaddy stays registrar, email postponed, $100 budget alert. Route 53 zone created (Z0717949LR359TMD2QLY), tagged project=honestbox, env=prod. |
 | Nov 17, 2026 | AWS account connected. Checked: no Route 53 zones, domains, certificates or buckets yet; `claude` user has AdministratorAccess. Tracker created. |
