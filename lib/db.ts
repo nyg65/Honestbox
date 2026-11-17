@@ -3,7 +3,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
-import { hashPassword } from './password.ts';
+import { hashPassword, verifyPassword } from './password.ts';
 import { randomBytes } from 'node:crypto';
 
 const DB_PATH = resolve(process.env.HB_DB_PATH || 'data/honestbox.db');
@@ -240,9 +240,20 @@ function migrate(d: DatabaseSync) {
  * HB_ADMIN_PASSWORD; there is no default, so a public site never runs with the sample password.
  * Locally, without the variable, the sample password from the README is used.
  */
-function ensureAdmin(d: DatabaseSync) {
+/** The admin password always comes from HB_ADMIN_PASSWORD: changing it there resets the password and signs out admin sessions. */
+export function ensureAdmin(d: DatabaseSync) {
+  const existing = d.prepare(`SELECT id, pass_hash FROM users WHERE role = 'admin' AND email = 'admin@honestbox.test'`).get() as { id: number; pass_hash: string } | undefined;
+  const envPw = process.env.HB_ADMIN_PASSWORD || '';
+  if (existing) {
+    if (envPw.length >= 12 && !verifyPassword(envPw, existing.pass_hash)) {
+      d.prepare('UPDATE users SET pass_hash = ? WHERE id = ?').run(hashPassword(envPw), existing.id);
+      d.prepare('DELETE FROM sessions WHERE user_id = ?').run(existing.id);
+      console.warn('HonestBox: admin password reset from HB_ADMIN_PASSWORD; admin sessions signed out.');
+    }
+    return;
+  }
   if (d.prepare(`SELECT 1 FROM users WHERE role = 'admin'`).get()) return;
-  const pw = process.env.HB_ADMIN_PASSWORD || (process.env.RENDER ? '' : 'honest-abe-1860');
+  const pw = envPw || (process.env.RENDER ? '' : 'honest-abe-1860');
   if (pw.length < 12) {
     if (process.env.RENDER) console.warn('HonestBox: no admin account yet. Set HB_ADMIN_PASSWORD (12+ characters) in Render, then restart.');
     return;
