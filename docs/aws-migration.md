@@ -15,7 +15,7 @@ Last updated: November 17, 2026 (afternoon)
 | DNS | **Route 53** (nameservers switched at GoDaddy Nov 17; GoDaddy stays registrar) | Nov 17 |
 | Website, admin, app API | Render, free plan: **https://honest-box.com** (also `www`, `api`, and `honestbox.onrender.com`), auto-deploys from GitHub `nyg65/Honestbox` `main` | Nov 17 |
 | Database | SQLite file on the Render server; wiped on every deploy (free plan, no disk) | Nov 17 |
-| Watch photos | Files on the Render server (wiped on every deploy) until S3 is switched on; bucket `honestbox-photos-917680159542` ready | Nov 17 |
+| Watch photos | S3 bucket `honestbox-photos-917680159542`, switched on in Render Nov 17 (served through the site's /media route) | Nov 17 |
 | AWS account | 917680159542: Route 53 zone Z0717949LR359TMD2QLY; certificate for honest-box.com and *.honest-box.com issued (us-east-1); no S3 buckets yet | Nov 17 |
 | AWS access for Claude | IAM user `claude` with **AdministratorAccess** (more than needed; see 0.3) | Nov 17 |
 | Phone app | Points at `https://honestbox.onrender.com` (`mobile/app.json`, `extra.apiUrl`) | Nov 17 |
@@ -37,6 +37,7 @@ Last updated: November 17, 2026 (afternoon)
 |---|---|---|---|---|
 | 0.1 | Turn on MFA for the AWS root user; store root credentials offline | John | Not started | Root should never be used day to day |
 | 0.2 | Budget alert at the D6 amount, emailed to John and Max | Claude | **Done** | Budget `honestbox-monthly`, $100/month: emails John at 50% and 100% actual, and when the forecast passes 100%. Add Max's address when he wants it. |
+| 0.3a | Rotate the `honestbox-app-render` access key when the site moves to AWS (the server will use an IAM role instead, and the key gets deleted) | Claude | Not started | |
 | 0.3 | Replace `claude`'s AdministratorAccess with a policy limited to the services this migration uses | Claude, approved by John | Not started | Route 53, ACM, S3, EC2/ECR, CloudFront, Secrets Manager, CloudWatch, IAM for the app's own role |
 | 0.4 | Turn on CloudTrail (one trail, all regions) so every change is logged | Claude | Not started | |
 | 0.5 | Tag everything `project=honestbox`, `env=prod` or `env=staging` for cost tracking | Claude | Not started | |
@@ -64,7 +65,7 @@ Rollback: point the nameservers back to GoDaddy's at GoDaddy. Leave the GoDaddy 
 | # | Task | Owner | Status | Notes |
 |---|---|---|---|---|
 | 2.1 | Private S3 bucket for watch photos, encrypted, versioned, no public access | Claude | **Done** | `honestbox-photos-917680159542` (us-east-1): all public access blocked, AES-256 encryption, versioning with old versions expiring after 90 days, HTTPS-only policy, tagged. Website user `honestbox-app-render` can only read/write/delete under `photos/`; no access key created yet. |
-| 2.2 | Change the site's photo storage from local files to S3 | Claude | **In progress** | Code done and tested Nov 17: photos go to S3 when `HB_S3_BUCKET` is set, else local. Waiting on approval to create the website's access key and put it in Render's environment (never shown in chat). |
+| 2.2 | Change the site's photo storage from local files to S3 | Claude | **In progress** | Code shipped Nov 17. Access key for `honestbox-app-render` created and set in Render with `HB_S3_BUCKET`, `HB_S3_REGION` (merged, other settings untouched); permissions verified with the IAM policy simulator. Last step: one real upload in Admin > Photos, then Claude confirms it landed in S3. |
 | 2.3 | CloudFront in front of the photos at `img.honest-box.com` | Claude | Not started | Fast loading; bucket stays private |
 | 2.4 | TLS certificates in ACM for honest-box.com and its subdomains, validated by DNS | Claude | **Done** | us-east-1, covers honest-box.com and *.honest-box.com (www, api, staging, img). Renews automatically while its validation record stays in Route 53. |
 | 2.5 | Secrets Manager for the admin password and future keys (payments, EveryWatch) | Claude; values entered by John | Not started | Values are never typed in chat |
@@ -107,6 +108,7 @@ Rollback: point the nameservers back to GoDaddy's at GoDaddy. Leave the GoDaddy 
 
 | Date | What happened |
 |---|---|
+| Nov 17, 2026 | Website access key created (stored only in Render's settings) and S3 switched on for photos; policy simulator confirms access is limited to the photos/ folder. |
 | Nov 17, 2026 | All three Render custom domains verified with certificates: honest-box.com is live on HTTPS. Photo bucket and website-only IAM user created; S3 storage code shipped (off until the key is added). |
 | Nov 17, 2026 | Custom domains added in Render; apex and api verified, www waiting on cached DNS. |
 | Nov 17, 2026 | $100 monthly budget alert created (emails John). Route 53 records added pointing honest-box.com, www and api at Render; verified with Route 53's answer test. GoDaddy record list cleaned up. |
