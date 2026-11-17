@@ -30,7 +30,7 @@ Last updated: November 17, 2026, 2:16 pm
 | D4 | Move the domain registration itself to Route 53? | Keep GoDaddy as registrar (only DNS moves), or transfer registration | Keep GoDaddy for now; transfer later if wanted (one-year renewal is included in a transfer) | **Decided: GoDaddy stays registrar; DNS moves to Route 53** |
 | D5 | Email on honest-box.com | None yet; Google Workspace; Microsoft 365; Amazon SES for sending receipts only | Decide before DNS moves so MX/SPF/DKIM records go in once | **Postponed** |
 | D6 | Monthly AWS budget alert | e.g. $50, $100, $250 | $100 to start | **Decided: $100** |
-| D7 | Web firewall (AWS WAF) | CloudFront flat-rate plan: Free $0 (5 WAF rules, rate limiting, country blocking, DDoS), Pro $15 (25 rules, CAPTCHA, logs), Business $200 (bot management, advanced DDoS); or pay-as-you-go WAF | Free plan through testing, **Pro at launch**, Business when volume and real money need bot management. WAF needs CloudFront in front of the site (Phase 3), so it can't protect the Render site. | Open |
+| D7 | Web firewall (AWS WAF) | CloudFront flat-rate plan: Free $0 (5 WAF rules, rate limiting, country blocking, DDoS), Pro $15 (25 rules, CAPTCHA, logs), Business $200 (bot management, advanced DDoS); or pay-as-you-go WAF | Free plan through testing, **Pro at launch**, Business when volume and real money need bot management. | **Decided: Free plan now** (Nov 17); revisit Pro at launch |
 
 ## Phase 0: Account safety
 
@@ -71,6 +71,8 @@ Rollback: point the nameservers back to GoDaddy's at GoDaddy. Leave the GoDaddy 
 | 2.4 | TLS certificates in ACM for honest-box.com and its subdomains, validated by DNS | Claude | **Done** | us-east-1, covers honest-box.com and *.honest-box.com (www, api, staging, img). Renews automatically while its validation record stays in Route 53. |
 | 2.5 | Secrets Manager for the admin password and future keys (payments, EveryWatch) | Claude; values entered by John | Not started | Values are never typed in chat |
 | 2.6 | S3 bucket for database backups, with a 90-day expiry | Claude | Not started | |
+| 2.7 | CloudFront in front of Render with WAF, on the CloudFront **Free** flat-rate plan | Claude | **In progress** | Distribution `E2H2962ANN6T1W` (`d1cyi3avysu8gc.cloudfront.net`), aliases honest-box.com, www, api; origin `honestbox.onrender.com` over HTTPS; pages never cached, only `/_next/static/*` and `/media/*`; edge function redirects www to honest-box.com. Firewall `honestbox-web`: Amazon IP reputation list, core rule set (body-size rule set to count so uploads work), known bad inputs, 2,000 requests per 5 minutes per IP. Free plan subscription active for the distribution, firewall and hosted zone. Site code trusts honest-box.com for form posts. Canary: api.honest-box.com moved to CloudFront; honest-box.com and www still point at Render until John confirms. |
+| 2.8 | Stop people bypassing the firewall via `honestbox.onrender.com` (secret header from CloudFront checked by the site) | Claude | Not started | Until then the Render address skips WAF; goes away entirely when Render is retired |
 
 ## Phase 3: Build the AWS home for the site
 
@@ -109,6 +111,7 @@ Rollback: point the nameservers back to GoDaddy's at GoDaddy. Leave the GoDaddy 
 
 | Date | What happened |
 |---|---|
+| Nov 17, 2026 | WAF Free plan set up: firewall honestbox-web, www-redirect edge function, CloudFront distribution E2H2962ANN6T1W, free plan subscription active (distribution, firewall, hosted zone). api.honest-box.com switched to CloudFront as a canary. Render records kept for rollback. |
 | Nov 17, 2026 | Reviewed WAF options; added decision D7 (CloudFront flat-rate plan tiers). |
 | Nov 17, 2026 | Admin password reset by John through Render's `HB_ADMIN_PASSWORD` setting. Site changed so that setting always wins: changing it resets the password and signs out admin sessions. Waiting on a test upload to confirm photos reach S3. |
 | Nov 17, 2026 | Website access key created (stored only in Render's settings) and S3 switched on for photos; policy simulator confirms access is limited to the photos/ folder. |
