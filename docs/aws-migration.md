@@ -5,7 +5,7 @@ Tracker for moving honest-box.com's DNS from GoDaddy to Route 53, then moving th
 Status key: **Not started** · **In progress** · **Blocked** · **Done**
 Owners: **John**, **Max**, **Claude** (Claude does AWS and code work through the connected AWS account; anything involving GoDaddy logins, payment or legal sign-off stays with John or Max).
 
-Last updated: November 17, 2026 (afternoon)
+Last updated: November 17, 2026, 2:16 pm
 
 ## Where things stand
 
@@ -108,6 +108,7 @@ Rollback: point the nameservers back to GoDaddy's at GoDaddy. Leave the GoDaddy 
 
 | Date | What happened |
 |---|---|
+| Nov 17, 2026 | Admin password reset by John through Render's `HB_ADMIN_PASSWORD` setting. Site changed so that setting always wins: changing it resets the password and signs out admin sessions. Waiting on a test upload to confirm photos reach S3. |
 | Nov 17, 2026 | Website access key created (stored only in Render's settings) and S3 switched on for photos; policy simulator confirms access is limited to the photos/ folder. |
 | Nov 17, 2026 | All three Render custom domains verified with certificates: honest-box.com is live on HTTPS. Photo bucket and website-only IAM user created; S3 storage code shipped (off until the key is added). |
 | Nov 17, 2026 | Custom domains added in Render; apex and api verified, www waiting on cached DNS. |
