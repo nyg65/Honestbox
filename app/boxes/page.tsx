@@ -18,7 +18,7 @@ export default async function Boxes({ searchParams }: { searchParams: Promise<Re
         <Flash sp={sp} />
         <div className="between" style={{ alignItems: 'flex-end' }}>
           <div className="stack" style={{ gap: 6 }}>
-            <h1 className="foil" style={{ fontSize: 'clamp(2.2rem, 5vw, 3.4rem)' }}>Pick your wheel</h1>
+            <h1 className="foil" style={{ fontSize: 'clamp(2.2rem, 5vw, 3.4rem)' }}>Pick your box</h1>
             <p className="muted">Every value from real sales. Every house edge printed. Slice colours show what a watch is worth.</p>
           </div>
           <TierScale />
@@ -27,7 +27,7 @@ export default async function Boxes({ searchParams }: { searchParams: Promise<Re
         <Link href="/drops" className="ticket engraved" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
           <span className="stack" style={{ gap: 2 }}>
             <span className="eyebrow">This week&apos;s drop</span>
-            <span className="serif" style={{ fontWeight: 700, fontSize: '1.4rem' }}>No wheel, no odds. Fixed honest prices.</span>
+            <span className="serif" style={{ fontWeight: 700, fontSize: '1.4rem' }}>No box, no odds. Fixed honest prices.</span>
           </span>
           <span className="btn">View the drop</span>
         </Link>

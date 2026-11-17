@@ -3,8 +3,9 @@ import { notFound } from 'next/navigation';
 import { Shell, Flash } from '@/components/Shell.tsx';
 import { WatchPhoto } from '@/components/WatchPhoto.tsx';
 import { mainPhoto } from '@/lib/photos.ts';
-import { Roulette, WheelFace } from '@/components/Roulette.tsx';
-import { pocketsOf, landedIndex } from '@/lib/wheel.ts';
+import { BoxOpening, BoxOpened } from '@/components/BoxOpening.tsx';
+import { pocketsOf, tierOf } from '@/lib/wheel.ts';
+import { bandPhoto } from '@/lib/showcase.ts';
 import { requireUser } from '@/lib/auth.ts';
 import { getPull, buybackQuote, settings, shipFee, valueBasis, flag } from '@/lib/engine.ts';
 import { usd, oneIn } from '@/lib/money.ts';
@@ -24,17 +25,16 @@ export default async function PullPage({ params, searchParams }: { params: Promi
   const daysLeft = Math.max(0, Math.ceil((Date.parse(p.hold_until) - Date.now()) / 86400_000));
   const reveal = revealAction.bind(null, p.id);
   const pockets = pocketsOf(p.odds_snapshot);
+  const photos = pockets.map((x) => bandPhoto(x.bandId));
 
   return (
     <Shell tab="vault">
       <div className="narrow page stack" style={{ gap: 20 }}>
         <span className="eyebrow">{p.box_name} · {usd(p.price_cents)} · pull #{p.id}</span>
         <Flash sp={sp} />
-        {!p.revealed ? <Roulette pockets={pockets} onSpin={reveal} /> : (
+        {!p.revealed ? <BoxOpening slug={p.box_slug} pockets={pockets} priceCents={p.price_cents} photos={photos} onSpin={reveal} /> : (
           <div className="stack rise" style={{ gap: 18 }}>
-            <div style={{ display: 'grid', placeItems: 'center' }}>
-              <WheelFace pockets={pockets} rotation={-(p.roll_ppm / 1_000_000) * 360} spinning={false} size={230} highlight={landedIndex(pockets, p.roll_ppm)} />
-            </div>
+            <BoxOpened slug={p.box_slug} tier={tierOf(p.value_cents).id} />
             <div className="cert stack" style={{ alignItems: 'center', gap: 14, textAlign: 'center', padding: '24px 20px' }}>
               <span className="pill pill-brass">{p.band_odds >= 500_000 ? 'Most common pull' : `${oneIn(p.band_odds)} pull`}</span>
               <WatchPhoto src={mainPhoto(p.reference, p.watch_id, 'full')} brand={p.brand} size={220} alt={`${p.brand} ${p.model}, reference ${p.reference}`} />
@@ -94,7 +94,7 @@ export default async function PullPage({ params, searchParams }: { params: Promi
               <div className="stack" style={{ gap: 6, marginTop: 10, wordBreak: 'break-all' }}>
                 <span>Server seed hash: <span className="mono">{p.server_hash}</span></span>
                 <span>Client seed: <span className="mono">{p.client_seed}</span> · Nonce: <span className="mono">{p.nonce}</span></span>
-                <span>Roll: <span className="mono">{p.roll_ppm.toLocaleString('en-US')}</span> of 1,000,000, so the pointer stopped {((p.roll_ppm / 1_000_000) * 360).toFixed(2)}° clockwise from the start of the first slice · Watch: {p.band_label}</span>
+                <span>Roll: <span className="mono">{p.roll_ppm.toLocaleString('en-US')}</span> of 1,000,000. Lay the box's watches end to end in the order listed in the odds snapshot, each as wide as its odds; the roll lands on {p.band_label}.</span>
                 {p.revealed_at
                   ? <span>Server seed (revealed): <span className="mono">{p.server_seed}</span></span>
                   : <span className="muted">The server seed is revealed when you rotate your seed on the <Link href="/fair">provably fair</Link> page.</span>}

@@ -53,7 +53,7 @@ export async function openBoxAction(f: FormData) {
   redirect(`/pulls/${id}`);
 }
 
-/** Marks the pull revealed and returns its roll, so the wheel can stop exactly where the roll says. */
+/** Marks the pull revealed and returns its roll, so the box opening can stop exactly on the watch the roll picks. */
 export async function revealAction(pullId: number): Promise<number> {
   const u = await requireUser();
   const p = E.getPull(u.id, pullId);

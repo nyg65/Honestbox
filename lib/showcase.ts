@@ -4,7 +4,7 @@ import type { TicketBox } from '@/components/Showcase.tsx';
 import { db } from './db.ts';
 import { mainPhoto } from './photos.ts';
 
-function bandPhoto(bandId: number) {
+export function bandPhoto(bandId: number) {
   const w = db().prepare('SELECT reference FROM watches WHERE band_id = ? AND reference <> \'\' LIMIT 1').get(bandId) as { reference: string } | undefined;
   return mainPhoto(w?.reference);
 }

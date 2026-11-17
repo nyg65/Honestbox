@@ -6,7 +6,9 @@ import { getBox, bandsFor, boxState, settings, balance, activeSeed, buybackQuote
 import { expectedValueCents, houseEdge } from '@/lib/fair.ts';
 import { usd, oneIn, pct } from '@/lib/money.ts';
 import { openBoxAction } from '../../actions.ts';
-import { WheelFace } from '@/components/Roulette.tsx';
+import { BoxArt } from '@/components/BoxArt.tsx';
+import { BoxContents } from '@/components/BoxContents.tsx';
+import { bandPhoto } from '@/lib/showcase.ts';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +29,7 @@ export default async function BoxPage({ params, searchParams }: { params: Promis
   const q = buybackQuote(10000, s);
   const pockets = bands.filter((b) => b.odds_ppm > 0).map((b) => ({ bandId: b.id, label: b.label, valueCents: b.value_cents, oddsPpm: b.odds_ppm }));
   const byValue = [...bands].sort((a, b) => b.value_cents - a.value_cents);
+  const photos = pockets.map((x) => bandPhoto(x.bandId));
 
   return (
     <Shell tab="boxes">
@@ -47,12 +50,12 @@ export default async function BoxPage({ params, searchParams }: { params: Promis
           <div className="card stack" style={{ gap: 2, padding: 14 }}><span className="muted" style={{ fontSize: '0.8rem' }}>Sell back any pull</span><span className="mono" style={{ fontSize: '1.05rem', lineHeight: 1.35 }}>{q.credit / 100}% as credit<br />{q.cash / 100}% as cash</span></div>
         </div>
 
-        <h2 className="eyebrow" style={{ fontFamily: 'var(--sans)' }}>The wheel: {pockets.length} watches</h2>
-        <div className="stack" style={{ alignItems: 'center', gap: 8 }}>
-          <WheelFace pockets={pockets} rotation={0} spinning={false} size={340} />
-          <p className="muted" style={{ fontSize: '0.9rem', textAlign: 'center', maxWidth: 440 }}>Every watch in the box is a slice on the wheel, drawn to its real odds. The rarest pieces are the thin slivers marked with brass dots. Where the pointer stops is your roll, and you can verify it.</p>
+        <div className="sheet" style={{ width: '100%' }}>
+          <BoxArt slug={box.slug} size="lg" state="idle" />
+          <BoxContents pockets={pockets} priceCents={box.price_cents} photos={photos} />
+          <p className="quiet" style={{ fontSize: '0.8rem' }}>When you open the box, the watches stream past and stop on the one your provably fair roll picks. You can verify every roll.</p>
         </div>
-        <h2 className="eyebrow" style={{ fontFamily: 'var(--sans)' }}>What&apos;s inside, highest value first</h2>
+        <h2 className="eyebrow" style={{ fontFamily: 'var(--sans)' }}>Stock and odds, highest value first</h2>
         <div className="stack" style={{ gap: 0, borderTop: '1px solid var(--rule)' }}>
           {byValue.map((b) => (
             <div key={b.id} className="stack" style={{ gap: 6, padding: '12px 0', borderBottom: '1px solid var(--rule)' }}>

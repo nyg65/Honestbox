@@ -112,6 +112,7 @@ Rollback: point the nameservers back to GoDaddy's at GoDaddy. Leave the GoDaddy 
 | Date | What happened |
 |---|---|
 | Nov 17, 2026 | WAF Free plan set up: firewall honestbox-web, www-redirect edge function, CloudFront distribution E2H2962ANN6T1W, free plan subscription active (distribution, firewall, hosted zone). api.honest-box.com switched to CloudFront as a canary. Render records kept for rollback. |
+| Nov 17, 2026 | Site redesign (box opening, darker green) deployed through Render; no infrastructure change. Apex and www still on Render, api on CloudFront. |
 | Nov 17, 2026 | Reviewed WAF options; added decision D7 (CloudFront flat-rate plan tiers). |
 | Nov 17, 2026 | Admin password reset by John through Render's `HB_ADMIN_PASSWORD` setting. Site changed so that setting always wins: changing it resets the password and signs out admin sessions. Waiting on a test upload to confirm photos reach S3. |
 | Nov 17, 2026 | Website access key created (stored only in Render's settings) and S3 switched on for photos; policy simulator confirms access is limited to the photos/ folder. |

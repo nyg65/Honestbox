@@ -1,3 +1,4 @@
+import { BoxArt } from './BoxArt.tsx';
 import Link from 'next/link';
 import { WatchArt, artFor } from './Mark.tsx';
 import { tierOf } from '@/lib/wheel.ts';
@@ -79,6 +80,7 @@ export function Ticket({ b, hot, back, as = 'link' }: { b: TicketBox; hot?: bool
   const body = (
     <>
       <span className="seal">{b.numeral}</span>
+      {!back && <span className="box-stage"><BoxArt slug={b.slug} size="sm" /></span>}
       <span className="name">{b.name}</span>
       <span className="price">{usd(b.priceCents)}</span>
       <span className="prize">
@@ -96,7 +98,7 @@ export function Ticket({ b, hot, back, as = 'link' }: { b: TicketBox; hot?: bool
         <span>House edge</span><b>{(b.edge * 100).toFixed(0)}%</b>
       </span>
       {b.closed ? <span className="pill" style={{ alignSelf: 'flex-start' }}>{b.closed}</span>
-        : <span className={`btn ${hot ? 'btn-gold' : ''} btn-block go`}>Spin for {usd(b.priceCents)}</span>}
+        : <span className={`btn ${hot ? 'btn-gold' : ''} btn-block go`}>Open box · {usd(b.priceCents)}</span>}
     </>
   );
   const cls = `ticket engraved${hot ? ' hot' : ''}${back ? ' back' : ''}`;
