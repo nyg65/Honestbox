@@ -10,6 +10,7 @@ process.env.HB_DB_PATH = join(dir, 'p.db');
 process.env.HB_UPLOAD_DIR = join(dir, 'uploads');
 const { db } = await import('../lib/db.ts');
 const P = await import('../lib/photos.ts');
+type Photo = import('../lib/photos.ts').Photo;
 
 const admin = () => (db().prepare("SELECT id FROM users WHERE role = 'admin'").get() as { id: number }).id;
 const jpeg = (w: number, h: number) => sharp({ create: { width: w, height: h, channels: 3, background: '#0D2219' } }).jpeg().toBuffer();
@@ -18,7 +19,7 @@ const ref = () => (db().prepare("SELECT reference FROM watches WHERE reference <
 test('an upload is resized to 1600px, thumbnailed, stored and becomes the main photo', async () => {
   const r = ref();
   const id = await P.savePhoto(admin(), { reference: r, angle: 'dial', bytes: await jpeg(3000, 2000) });
-  const p = db().prepare('SELECT * FROM photos WHERE id = ?').get(id) as P.Photo;
+  const p = db().prepare('SELECT * FROM photos WHERE id = ?').get(id) as Photo;
   assert.equal(p.width, 1600); assert.equal(p.height, 1067);
   assert.ok(existsSync(join(P.uploadDir(), p.file)) && existsSync(join(P.uploadDir(), p.thumb)));
   assert.match(p.file, P.FILE_RE);
@@ -33,11 +34,11 @@ test('make main reorders; a piece photo wins for that piece only; delete removes
   assert.equal(P.mainPhoto(r), P.photoUrl(main.thumb));
   const piece = (db().prepare('SELECT id FROM watches WHERE reference = ? LIMIT 1').get(r) as { id: number }).id;
   const own = await P.savePhoto(admin(), { reference: r, watchId: piece, angle: 'dial', bytes: await jpeg(900, 900) });
-  const ownRow = db().prepare('SELECT * FROM photos WHERE id = ?').get(own) as P.Photo;
+  const ownRow = db().prepare('SELECT * FROM photos WHERE id = ?').get(own) as Photo;
   assert.equal(P.mainPhoto(r, piece), P.photoUrl(ownRow.thumb));
   assert.equal(P.mainPhoto(r), P.photoUrl(main.thumb), 'the model photo is unchanged');
   assert.equal(P.galleryFor(r, piece)[0].id, own);
-  P.deletePhoto(admin(), own);
+  await P.deletePhoto(admin(), own);
   assert.ok(!existsSync(join(P.uploadDir(), ownRow.file)));
 });
 
@@ -48,4 +49,21 @@ test('bad uploads are refused with a clear message', async () => {
   await assert.rejects(P.savePhoto(admin(), { reference: r, angle: 'selfie', bytes: await jpeg(10, 10) }), /which angle/);
   const other = (db().prepare('SELECT id FROM watches WHERE reference <> ? AND reference <> \'\' LIMIT 1').get(r) as { id: number }).id;
   await assert.rejects(P.savePhoto(admin(), { reference: r, watchId: other, angle: 'dial', bytes: await jpeg(10, 10) }), /different reference/);
+});
+
+test('with an S3-style store, files go to the store and come back through it', async () => {
+  const S = await import('../lib/storage.ts');
+  const files = new Map<string, Buffer>();
+  S.setStoreForTests({ kind: 's3', async put(n, b) { files.set(n, b); }, async get(n) { return files.get(n) ?? null; }, async remove(n) { files.delete(n); } });
+  try {
+    const id = await P.savePhoto(admin(), { reference: ref(), angle: 'clasp', bytes: await jpeg(1200, 900) });
+    const p = db().prepare('SELECT * FROM photos WHERE id = ?').get(id) as Photo;
+    assert.ok(files.has(p.file) && files.has(p.thumb), 'both sizes stored');
+    assert.ok(!existsSync(join(P.uploadDir(), p.file)), 'nothing written locally');
+    assert.ok((await S.store().get(p.file))!.length > 1000);
+    await P.deletePhoto(admin(), id);
+    assert.equal(files.size, 0, 'both sizes removed from the store');
+    S.setStoreForTests({ kind: 's3', async put() { throw new Error('network down'); }, async get() { return null; }, async remove() {} });
+    await assert.rejects(P.savePhoto(admin(), { reference: ref(), angle: 'clasp', bytes: await jpeg(50, 50) }), /could not be saved to storage/);
+  } finally { S.setStoreForTests(null); }
 });

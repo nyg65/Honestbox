@@ -1,9 +1,8 @@
 // Watch photos. Model photos are keyed by exact reference number and shown wherever that model appears;
 // piece photos belong to one physical watch and are shown for drops and for what a customer actually pulled.
 // Every upload is auto-rotated, resized to 1600px on its long edge and saved as WebP, with a 480px thumbnail.
-import { mkdirSync, writeFileSync, unlinkSync, existsSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
+import { store, localDir } from './storage.ts';
 import sharp from 'sharp';
 import { db, tx } from './db.ts';
 import { audit, UserError } from './engine.ts';
@@ -18,12 +17,8 @@ const ANGLE_IDS = new Set<string>(ANGLES.map(([a]) => a));
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 export const FILE_RE = /^[a-f0-9]{32}(-t)?\.webp$/;
 
-export function uploadDir() {
-  const dir = process.env.HB_UPLOAD_DIR
-    || (process.env.HB_DB_PATH ? join(dirname(resolve(process.env.HB_DB_PATH)), 'uploads') : join(process.cwd(), 'data', 'uploads'));
-  mkdirSync(dir, { recursive: true });
-  return dir;
-}
+/** Local folder used when S3 is not configured. */
+export const uploadDir = localDir;
 
 export const photoUrl = (file: string) => `/media/${file}`;
 
@@ -46,14 +41,20 @@ export async function savePhoto(actorId: number, input: { reference: string; wat
     throw new UserError('Upload a JPEG, PNG or WebP photo. On an iPhone, set Camera > Formats to Most Compatible, or share the photo as JPEG.');
   }
   const id = randomBytes(16).toString('hex');
-  const file = `${id}.webp`, thumb = `${id}-t.webp`, dir = uploadDir();
-  let full;
+  const file = `${id}.webp`, thumb = `${id}-t.webp`;
+  let full, small;
   try {
     full = await sharp(input.bytes).rotate().resize({ width: 1600, height: 1600, fit: 'inside', withoutEnlargement: true }).webp({ quality: 84 }).toBuffer({ resolveWithObject: true });
-    const small = await sharp(input.bytes).rotate().resize({ width: 480, height: 480, fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
-    writeFileSync(join(dir, file), full.data); writeFileSync(join(dir, thumb), small);
+    small = await sharp(input.bytes).rotate().resize({ width: 480, height: 480, fit: 'inside', withoutEnlargement: true }).webp({ quality: 80 }).toBuffer();
   } catch {
     throw new UserError('That photo could not be read. Try exporting it as a JPEG.');
+  }
+  try {
+    await store().put(file, full.data, 'image/webp');
+    await store().put(thumb, small, 'image/webp');
+  } catch (e) {
+    console.error('photo storage failed', e);
+    throw new UserError('The photo could not be saved to storage. Try again in a minute; if it keeps failing, storage needs checking.');
   }
   return tx((d) => {
     const next = (d.prepare('SELECT COALESCE(MAX(sort), -1) + 1 AS n FROM photos WHERE reference = ? AND watch_id IS ?').get(reference, input.watchId ?? null) as { n: number }).n;
@@ -64,11 +65,11 @@ export async function savePhoto(actorId: number, input: { reference: string; wat
   });
 }
 
-export function deletePhoto(actorId: number, photoId: number) {
+export async function deletePhoto(actorId: number, photoId: number) {
   const p = db().prepare('SELECT * FROM photos WHERE id = ?').get(photoId) as Photo | undefined;
   if (!p) throw new UserError('That photo was already removed.');
   tx((d) => { d.prepare('DELETE FROM photos WHERE id = ?').run(photoId); audit(d, actorId, 'photo.delete', JSON.stringify({ id: photoId, reference: p.reference })); });
-  for (const f of [p.file, p.thumb]) { const path = join(uploadDir(), f); if (existsSync(path)) unlinkSync(path); }
+  for (const f of [p.file, p.thumb]) { try { await store().remove(f); } catch (e) { console.error('photo delete failed', f, e); } }
 }
 
 /** Puts this photo first for its model (or piece); it becomes the one shown on cards and in boxes. */

@@ -229,7 +229,8 @@ export async function adminPhotoPrimary(f: FormData) {
 
 export async function adminPhotoDelete(f: FormData) {
   const me = await requireAdmin();
-  attempt('/admin/photos', () => P.deletePhoto(me.id, int(f, 'photo')));
+  try { await P.deletePhoto(me.id, int(f, 'photo')); }
+  catch (e) { if (e instanceof E.UserError) back('/admin/photos', 'error', e.message); throw e; }
   revalidatePath('/', 'layout');
   back('/admin/photos', 'ok', 'Photo removed.');
 }
