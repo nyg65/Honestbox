@@ -5,18 +5,18 @@ Tracker for moving honest-box.com's DNS from GoDaddy to Route 53, then moving th
 Status key: **Not started** · **In progress** · **Blocked** · **Done**
 Owners: **John**, **Max**, **Claude** (Claude does AWS and code work through the connected AWS account; anything involving GoDaddy logins, payment or legal sign-off stays with John or Max).
 
-Last updated: November 17, 2026
+Last updated: November 17, 2026 (afternoon)
 
 ## Where things stand
 
 | Item | Today | Checked |
 |---|---|---|
 | Domain registrar | GoDaddy (honest-box.com) | As told by John |
-| DNS | GoDaddy; current records not yet exported | Not readable from Claude's workspace |
+| DNS | Still served by GoDaddy; Route 53 zone ready but not live until the nameservers change at GoDaddy | Nov 17 |
 | Website, admin, app API | Render, free plan: `honestbox.onrender.com`, auto-deploys from GitHub `nyg65/Honestbox` `main` | Nov 17 |
 | Database | SQLite file on the Render server; wiped on every deploy (free plan, no disk) | Nov 17 |
 | Watch photos | Files on the Render server; also wiped on every deploy | Nov 17 |
-| AWS account | 917680159542: no Route 53 zones, no domains, no certificates, no S3 buckets | Nov 17 |
+| AWS account | 917680159542: Route 53 zone for honest-box.com created (Z0717949LR359TMD2QLY); no certificates or S3 buckets yet | Nov 17 |
 | AWS access for Claude | IAM user `claude` with **AdministratorAccess** (more than needed; see 0.3) | Nov 17 |
 | Phone app | Points at `https://honestbox.onrender.com` (`mobile/app.json`, `extra.apiUrl`) | Nov 17 |
 
@@ -24,12 +24,12 @@ Last updated: November 17, 2026
 
 | # | Decision | Options | Recommendation | Status |
 |---|---|---|---|---|
-| D1 | AWS region | us-east-1 (N. Virginia), us-east-2 (Ohio), us-west-2 (Oregon) | **us-east-2**: close to Texas, full service coverage. Certificates for CloudFront still live in us-east-1. | Open |
-| D2 | Hosting setup for launch | **A.** One small EC2 server (or Lightsail) running the site in Docker, SQLite on an attached disk, photos in S3. **B.** ECS Fargate containers + RDS Postgres + S3. | **A** for launch: closest to today's code, roughly $15–40 a month, no database rewrite. Move to **B** before real-money volume needs more than one server. | Open |
-| D3 | Web address layout | `honest-box.com` for the site, `www` redirects to it, `api.honest-box.com` for the app, `staging.honest-box.com` for testing | As listed | Open |
-| D4 | Move the domain registration itself to Route 53? | Keep GoDaddy as registrar (only DNS moves), or transfer registration | Keep GoDaddy for now; transfer later if wanted (one-year renewal is included in a transfer) | Open |
-| D5 | Email on honest-box.com | None yet; Google Workspace; Microsoft 365; Amazon SES for sending receipts only | Decide before DNS moves so MX/SPF/DKIM records go in once | Open |
-| D6 | Monthly AWS budget alert | e.g. $50, $100, $250 | $100 to start | Open |
+| D1 | AWS region | us-east-1 (N. Virginia), us-east-2 (Ohio), us-west-2 (Oregon) | **us-east-2**: close to Texas, full service coverage. Certificates for CloudFront still live in us-east-1. | **Decided: us-east-1** |
+| D2 | Hosting setup for launch | **A.** One small EC2 server (or Lightsail) running the site in Docker, SQLite on an attached disk, photos in S3. **B.** ECS Fargate containers + RDS Postgres + S3. | **A** for launch: closest to today's code, roughly $15–40 a month, no database rewrite. Move to **B** before real-money volume needs more than one server. | **Decided: A** |
+| D3 | Web address layout | `honest-box.com` for the site, `www` redirects to it, `api.honest-box.com` for the app, `staging.honest-box.com` for testing | As listed | **Decided: as listed, including staging** |
+| D4 | Move the domain registration itself to Route 53? | Keep GoDaddy as registrar (only DNS moves), or transfer registration | Keep GoDaddy for now; transfer later if wanted (one-year renewal is included in a transfer) | **Decided: GoDaddy stays registrar; DNS moves to Route 53** |
+| D5 | Email on honest-box.com | None yet; Google Workspace; Microsoft 365; Amazon SES for sending receipts only | Decide before DNS moves so MX/SPF/DKIM records go in once | **Postponed** |
+| D6 | Monthly AWS budget alert | e.g. $50, $100, $250 | $100 to start | **Decided: $100** |
 
 ## Phase 0: Account safety
 
@@ -49,11 +49,11 @@ Goal: Route 53 answers for honest-box.com with exactly the records GoDaddy has t
 |---|---|---|---|---|
 | 1.1 | Export the zone file from GoDaddy (Domain > DNS > Export) and send it to Claude | John | Not started | Must include every record: A, CNAME, MX, TXT (SPF, verification), CAA, SRV |
 | 1.2 | Note whether DNSSEC is on at GoDaddy | John | Not started | If on, turn it off at GoDaddy before 1.7, or the domain stops resolving |
-| 1.3 | Create the honest-box.com hosted zone in Route 53 | Claude | Not started | About $0.50 a month plus queries |
+| 1.3 | Create the honest-box.com hosted zone in Route 53 | Claude | **Done** | Zone Z0717949LR359TMD2QLY. Nameservers: ns-493.awsdns-61.com, ns-1825.awsdns-36.co.uk, ns-974.awsdns-57.net, ns-1419.awsdns-49.org. About $0.50 a month plus queries |
 | 1.4 | Recreate every GoDaddy record in Route 53; drop GoDaddy's parking records | Claude | Not started | Checked line by line against 1.1 |
 | 1.5 | Add site records: `honest-box.com`, `www`, `api`, `staging` pointing to Render for now | Claude | Not started | Render custom domains: add them in Render first, then use the targets Render shows |
 | 1.6 | Lower TTLs at GoDaddy to 300 seconds a day before the switch | John | Not started | Makes the switch and any rollback quick |
-| 1.7 | Change honest-box.com's nameservers at GoDaddy to the four Route 53 nameservers | John | Not started | Claude supplies them after 1.3 |
+| 1.7 | Change honest-box.com's nameservers at GoDaddy to the four Route 53 nameservers | John | Not started | Only after 1.1–1.5 are done, unless the domain has no records in use |
 | 1.8 | Verify: nameservers, every record, email delivery, HTTPS on the site | Claude | Not started | Check over 24–48 hours while caches expire |
 | 1.9 | Turn DNSSEC back on, now signed by Route 53 (optional) | Claude | Not started | Then add the DS record at GoDaddy |
 
@@ -107,4 +107,5 @@ Rollback: point the nameservers back to GoDaddy's at GoDaddy. Leave the GoDaddy 
 
 | Date | What happened |
 |---|---|
+| Nov 17, 2026 | Decisions: us-east-1, single server (A), addresses as listed with staging, GoDaddy stays registrar, email postponed, $100 budget alert. Route 53 zone created (Z0717949LR359TMD2QLY), tagged project=honestbox, env=prod. |
 | Nov 17, 2026 | AWS account connected. Checked: no Route 53 zones, domains, certificates or buckets yet; `claude` user has AdministratorAccess. Tracker created. |
