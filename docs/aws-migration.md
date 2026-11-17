@@ -30,6 +30,7 @@ Last updated: November 17, 2026, 2:16 pm
 | D4 | Move the domain registration itself to Route 53? | Keep GoDaddy as registrar (only DNS moves), or transfer registration | Keep GoDaddy for now; transfer later if wanted (one-year renewal is included in a transfer) | **Decided: GoDaddy stays registrar; DNS moves to Route 53** |
 | D5 | Email on honest-box.com | None yet; Google Workspace; Microsoft 365; Amazon SES for sending receipts only | Decide before DNS moves so MX/SPF/DKIM records go in once | **Postponed** |
 | D6 | Monthly AWS budget alert | e.g. $50, $100, $250 | $100 to start | **Decided: $100** |
+| D7 | Web firewall (AWS WAF) | CloudFront flat-rate plan: Free $0 (5 WAF rules, rate limiting, country blocking, DDoS), Pro $15 (25 rules, CAPTCHA, logs), Business $200 (bot management, advanced DDoS); or pay-as-you-go WAF | Free plan through testing, **Pro at launch**, Business when volume and real money need bot management. WAF needs CloudFront in front of the site (Phase 3), so it can't protect the Render site. | Open |
 
 ## Phase 0: Account safety
 
@@ -100,7 +101,7 @@ Rollback: point the nameservers back to GoDaddy's at GoDaddy. Leave the GoDaddy 
 | # | Task | Owner | Status | Notes |
 |---|---|---|---|---|
 | 5.1 | Move to D2 option B (RDS Postgres, more than one server) if volume needs it | Claude | Not started | |
-| 5.2 | Web application firewall (AWS WAF) with rate limits on sign-in and box opening | Claude | Not started | |
+| 5.2 | Web application firewall (AWS WAF) with rate limits on sign-in and box opening | Claude | Not started | Plan per D7; basic WAF arrives with CloudFront in Phase 3 |
 | 5.3 | Transactional email (receipts, sign-in links) through Amazon SES with SPF, DKIM and DMARC | Claude | Not started | Depends on D5 |
 | 5.4 | Review of payment, ID-verification and data-retention requirements with the attorney | John, Max | Not started | |
 
@@ -108,6 +109,7 @@ Rollback: point the nameservers back to GoDaddy's at GoDaddy. Leave the GoDaddy 
 
 | Date | What happened |
 |---|---|
+| Nov 17, 2026 | Reviewed WAF options; added decision D7 (CloudFront flat-rate plan tiers). |
 | Nov 17, 2026 | Admin password reset by John through Render's `HB_ADMIN_PASSWORD` setting. Site changed so that setting always wins: changing it resets the password and signs out admin sessions. Waiting on a test upload to confirm photos reach S3. |
 | Nov 17, 2026 | Website access key created (stored only in Render's settings) and S3 switched on for photos; policy simulator confirms access is limited to the photos/ folder. |
 | Nov 17, 2026 | All three Render custom domains verified with certificates: honest-box.com is live on HTTPS. Photo bucket and website-only IAM user created; S3 storage code shipped (off until the key is added). |
